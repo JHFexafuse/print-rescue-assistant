@@ -1,4 +1,4 @@
-# PrintRescue Assistant 0.1.1 – Printwars
+# PrintRescue Assistant 0.1.2 – Printwars
 
 Erste installierbare Testversion für die am 24.09.2026 bereitgestellte Konfiguration.
 Sie vereinfacht die Wiederaufnahme eines beschädigten Drucks bei **erhaltener Z-Referenz**.
@@ -18,8 +18,10 @@ Der private Voron ist kein Bestandteil dieses Druckerprofils.
 - Z-Homing wird durch eine Ergänzung im bestehenden Homing-Override während der Reparatursitzung gesperrt.
 - Veraltete Reparaturdateien benötigen eine neue, passende Prüfsitzung; ein einfaches späteres Starten der Datei reicht nicht.
 
-Die Oberfläche ist eine zusätzliche Seite auf dem Drucker, erreichbar unter `/print-rescue/`.
-Sie ist kein eingebauter Mainsail-Tab. Mainsail bleibt für Geschwindigkeit, Babystepping und Abbruch verfügbar.
+Die Oberfläche ist unter `/print-rescue/` erreichbar. Ab Version 0.1.2 kann sie über
+`--mainsail-embed` zusätzlich im Inhaltsbereich von Mainsail eingebettet werden.
+Seitenleiste und Kopfleiste bleiben dabei erreichbar. Beim Wechsel zu Mainsail und
+zurück bleiben geladene Datei, Layerauswahl und Prüfsitzung im Browser erhalten.
 Es werden keine Cloud-Dienste oder zusätzlichen laufenden Hintergrunddienste benötigt.
 
 ## GitHub und Updates über Mainsail
@@ -28,20 +30,21 @@ Die Installation als Git-Checkout ist für die Weiterentwicklung vorgesehen. Moo
 
 `enable_auto_refresh` in Moonraker betrifft die Suche nach Updates; diese Einrichtung installiert keine Updates selbstständig. Durch den Klipper-Neustart geht die Positionsreferenz verloren. Deshalb den Update-Knopf nur zwischen Druckaufträgen verwenden, bevor ein zu rettendes Teil auf dem Bett steht.
 
-Der Installer verknüpft nur die beiden benötigten Dateien:
+Der Installer verknüpft diese Dateien:
 
 | Installierte Datei | Quelle im Git-Checkout |
 | --- | --- |
 | `<Mainsail-Webordner>/print-rescue/index.html` | `index.html` |
 | `<Konfigurationsordner>/print_rescue.cfg` | `integration/print_rescue.cfg` |
+| `<Mainsail-Webordner>/print-rescue/mainsail-embed.js` (bei Einbettung) | `integration/mainsail-embed.js` |
 
-Die Homepage von Mainsail, die übrige Druckerkonfiguration und das bestehende Homing-Makro liegen weiterhin außerhalb des Repositories. Die Homing-Sperre wird einmalig beim Installieren ergänzt. Falls eine spätere Version Änderungen an dieser Sperre benötigt, muss sie als ausdrücklicher Migrationsschritt dokumentiert werden; ein `git pull` schreibt keine fremden Konfigurationsdateien um.
+Die Homepage von Mainsail, die übrige Druckerkonfiguration und das bestehende Homing-Makro liegen weiterhin außerhalb des Repositories. Die optionale Einbettung ergänzt einen markierten Loader in Mainsails `index.html` und aktualisiert gegebenenfalls deren Cache-Eintrag in `sw.js`. Die Homing-Sperre wird einmalig beim Installieren ergänzt. Falls eine spätere Version Änderungen an dieser Sperre benötigt, muss sie als ausdrücklicher Migrationsschritt dokumentiert werden; ein `git pull` schreibt keine fremden Konfigurationsdateien um.
 
 ### Repository und Versionen
 
 Quellcode und Updates: [JHFexafuse/print-rescue-assistant](https://github.com/JHFexafuse/print-rescue-assistant). Der Entwicklungsstand liegt auf `main`.
 
-Das Repository braucht einen Branch `main` oder `master`, einen Remote `origin` und mindestens einen erreichbaren Versionstag im Format `vX.Y.Z` (für dieses Paket: `v0.1.1`). Das fertig gebaute `index.html` gehört mit ins Repository; auf dem Drucker ist kein Node.js-Build nötig.
+Das Repository braucht einen Branch `main` oder `master`, einen Remote `origin` und mindestens einen erreichbaren Versionstag im Format `vX.Y.Z`. Das fertig gebaute `index.html` gehört mit ins Repository; auf dem Drucker ist kein Node.js-Build nötig.
 
 Das Repository enthält die Projektdateien und das zum Abgleich erforderliche Integrationsprofil. Vollständige Druckerkonfigurationen, G-Code-Druckaufträge und Zugangsdaten gehören nicht hinein.
 
@@ -54,19 +57,20 @@ Voraussetzung: Git und Python 3.9 oder neuer auf dem Klipper-Rechner. Die Erstin
 ```bash
 git clone https://github.com/JHFexafuse/print-rescue-assistant.git ~/print-rescue
 cd ~/print-rescue
-python3 install.py --config-dir ~/printer_data/config --web-root ~/mainsail --git-updates --dry-run
+python3 install.py --config-dir ~/printer_data/config --web-root ~/mainsail --git-updates --mainsail-embed --dry-run
 ```
 
 Bei erfolgreicher Prüfung:
 
 ```bash
-python3 install.py --config-dir ~/printer_data/config --web-root ~/mainsail --git-updates
+python3 install.py --config-dir ~/printer_data/config --web-root ~/mainsail --git-updates --mainsail-embed
 ```
 
 Der Git-Modus funktioniert auch nach der bisherigen ZIP-Installation. Vorhandene Dateien werden gesichert und durch die Verknüpfungen ersetzt. Der Installer ergänzt außerdem:
 
 - `print_rescue_updates.conf` samt Include in `moonraker.conf`, mit tatsächlichem Git-Pfad, Remote und Branch.
 - „Druck retten“ in `.theme/navi.json`; vorhandene Links bleiben erhalten.
+- Mit `--mainsail-embed`: Einbettung innerhalb Mainsails; ohne diese Option öffnet eine neue Installation einen separaten Tab.
 
 Danach einmal **Moonraker neu starten** (zum Einlesen des neuen Update-Eintrags) und **Klipper neu starten** (zum Laden der Makros), zum Beispiel über Mainsails Dienstesteuerung. Der Installer führt selbst keine Diensteneustarts aus. Mainsail anschließend neu laden.
 
@@ -84,15 +88,36 @@ managed_services: klipper
 
 `channel: dev` verwendet für die gemeinsame Testphase die Commits des eingestellten Branches. Es bedeutet keine automatische Installation. Bei einem Repository mit `master` übernimmt der Installer `primary_branch: master`.
 
+### Bestehende Installation in Mainsail einbetten
+
+Den laufenden Test bzw. die Handprüfung erst abschließen, bevor die Browserseite neu geladen wird. Für dieses reine Oberflächenupdate von 0.1.1 auf 0.1.2 ist **kein Diensteneustart** nötig. Den normalen Moonraker-Update-Knopf während eines Drucks oder einer Rettung nicht verwenden: Der konfigurierte Eintrag würde Klipper neu starten.
+
+Auf dem Klipper-Rechner, mit den bisherigen Installationspfaden:
+
+```bash
+cd ~/print-rescue
+git pull --ff-only
+python3 install.py --config-dir ~/printer_data/config --web-root ~/mainsail --mainsail-embed --ui-only --dry-run
+python3 install.py --config-dir ~/printer_data/config --web-root ~/mainsail --mainsail-embed --ui-only
+```
+
+Danach Mainsail mit **Strg+F5** vollständig neu laden. „Druck retten“ öffnet nun im Inhaltsbereich. „Zurück zu Mainsail“ oder ein Mainsail-Menüpunkt blendet die Rettungsansicht aus, ohne sie zu entladen. Ein erneuter Klick auf „Druck retten“ zeigt dieselbe Sitzung. Ein vollständiges Neuladen des Browserfensters verwirft weiterhin die lokale Dateiauswahl.
+
+`--ui-only` ändert ausschließlich Webdateien und `.theme/navi.json`; Druckermakros, Homing-Sperre und Moonraker-Konfiguration bleiben erhalten. Vorhandene Git-Verknüpfungen werden beibehalten. Der Installer sichert auch Mainsails ursprüngliche Startseite. Falls Nginx komprimierte Kopien von `index.html` oder `sw.js` vorhält, werden diese gesichert und entfernt, damit die aktualisierten Dateien ausgeliefert werden.
+
+Bei HTTPS/PWA aktualisiert der Installer den HTML-Cache-Eintrag in Mainsails Workbox-Service-Worker. Gegebenenfalls nach dessen Aktualisierung nochmals neu laden. Die eingebettete Oberfläche wird als normale Datei geladen; Mainsails Routen-Cache kann sie dadurch nicht durch sein Dashboard ersetzen. Ein unbekanntes Service-Worker-Format stoppt die Installation vor Schreibzugriffen.
+
+Dies ist eine lokale Ergänzung für die Mainsail-2.x-Struktur, keine offizielle Mainsail-Plugin-Schnittstelle. Ein **Mainsail-Update kann den Loader und den Zusatzordner überschreiben**. Danach denselben `--mainsail-embed --ui-only`-Befehl wieder ausführen; dabei sind keine Klipper- oder Moonraker-Neustarts nötig. Normale PrintRescue-Updates laden die verknüpfte Oberfläche und den Loader aus dem Checkout.
+
 ### Spätere Updates
 
 1. In Mainsail unter **Maschine → Update-Manager** nach Updates suchen und **PrintRescue aktualisieren** anklicken.
 2. Moonraker lädt die neue Version und startet Klipper neu.
-3. Den PrintRescue-Tab neu laden. Versionsnummer, Meldungen und Änderungen in `CHANGELOG.md` prüfen.
+3. Mainsail bzw. den separaten PrintRescue-Tab vollständig neu laden. Versionsnummer, Meldungen und Änderungen in `CHANGELOG.md` prüfen.
 
 Ein bereits offener Browser-Tab verwendet bis zum Neuladen seinen bisherigen Programmstand. Die Oberfläche prüft beim Verbinden, ob die geladenen Makros zum eingebauten Profil passen. Ein erkannter Unterschied sperrt Bewegungen.
 
-Änderungen im Git-Checkout werden von Moonraker als lokale Änderungen behandelt. Persönliche Konfigurationen deshalb außerhalb des Checkouts belassen. Wenn ein Mainsail-Update den Zusatzordner entfernt, den Installer erneut mit denselben Optionen ausführen.
+Änderungen im Git-Checkout werden von Moonraker als lokale Änderungen behandelt. Persönliche Konfigurationen deshalb außerhalb des Checkouts belassen. Die Einbettung nach einem Mainsail-Update gegebenenfalls mit dem oben beschriebenen UI-Befehl wiederherstellen.
 
 ### Entwicklung und Versionsstände
 
@@ -100,7 +125,7 @@ Vor einem Commit Änderungen testen und die Browserdatei neu bauen:
 
 ```bash
 python3 build.py
-node --test tests/gcode.test.mjs tests/ui.test.mjs
+node --test tests/gcode.test.mjs tests/ui.test.mjs tests/embed.test.mjs
 python3 tests/install_test.py
 python3 tests/macros_test.py
 ```
@@ -109,7 +134,7 @@ Für den letzten Test ist Jinja2 erforderlich, nur als Entwicklungsabhängigkeit
 
 ## Mainsail-Menü bei ZIP-Installation
 
-Auch ohne Git kann der Installer mit `--mainsail-link` den Seitenleisteneintrag ergänzen. Die Git-Installation enthält diesen Schritt bereits.
+Auch ohne Git kann der Installer mit `--mainsail-link` den Seitenleisteneintrag ergänzen oder mit `--mainsail-embed` die eingebettete Ansicht einrichten. Die Git-Installation enthält den Menüeintrag bereits.
 
 ## Zuerst ohne Installation ansehen
 
@@ -197,7 +222,7 @@ Das Mesh und vorhandene Koordinatenoffsets werden nicht neu kalibriert. Die Soft
 - Der vorhandene PETG-Mesh-Name ist Bestandteil dieses konkreten Profils. Änderungen am Profil müssen vor Verwendung abgestimmt werden.
 - Kein automatisches Priming am Bauteil: funktionsfähige, vorbereitete Filamentförderung bestätigt der Bediener.
 - Text-G-Code bis 256 MiB und 12 Millionen Vorschausegmente. Große Dateien werden im Browser analysiert, nicht auf dem Raspberry Pi.
-- Ein Mainsail-Update kann bei manchen Installationsmethoden den Zusatzordner entfernen. Der Installer kann dann erneut verwendet werden.
+- Ein Mainsail-Update kann den Loader und den Zusatzordner entfernen. Die Einbettung dann mit `--mainsail-embed --ui-only` wiederherstellen. Nicht für Mainsails extern gehostete Oberfläche `my.mainsail.xyz` vorgesehen; Mainsail und PrintRescue müssen auf derselben Drucker-Webadresse liegen.
 - Physischer Wiederanlauf und visuelle Darstellung in einem echten Browser wurden hier noch nicht am Zielsystem getestet. Dies ist eine **Testversion**, keine bereits im Produktionsbetrieb abgenommene Erweiterung.
 
 V2 ist für den Wiederanlauf nach Abschaltung vorgesehen: kontrollierte manuelle Z-Referenz sowie individuelles Ausrichten der vier Z-Motoren. Diese Funktionen sind in V1 absichtlich nicht enthalten.
@@ -213,6 +238,7 @@ V2 ist für den Wiederanlauf nach Abschaltung vorgesehen: kontrollierte manuelle
 - Bedienlogik mit simuliertem DOM und Moonraker geprüft, einschließlich Reihenfolge Upload → Bestätigung/Homing → Druckstart.
 - Installationsprüfung mit Konfigurationskopien: Probelauf, Sicherungen, wiederholte Installation, Include-Reihenfolge und unveränderte übrige Dateien.
 - Version 0.1.1: neun zusätzliche Installationstests für ZIP-zu-Git-Migration, unveränderte Mainsail-Startseite, vorhandene Menüpunkte, Dateiverknüpfungen nach einem simulierten Git-Update, Branch-Auswahl, ungültige Eingaben und Wiederherstellung nach Schreibfehler. Insgesamt 30 automatisierte Tests bestanden.
+- Version 0.1.2: sechs Tests der Einbettung mit simuliertem DOM und sechs zusätzliche Installer-Tests. Geprüft werden Navigation, Erhalt derselben eingebetteten Sitzung, Abstand zu Seitenleiste/Kopfleiste, Verbindungsverlust, Ladefehler, reine UI-Installation ohne Änderung der Druckerkonfiguration, Cache-Anpassung und Wiederherstellung nach Schreibfehler. Die Verbindungsvorbelegung innerhalb der eingebetteten Seite ist ebenfalls geprüft. Insgesamt 42 automatisierte Tests bestanden.
 
 Die Cloud-Browserumgebung hat den Zugriff auf die lokale HTML-Datei gesperrt. Deshalb wurde kein erfolgreicher visueller Browsercheck behauptet. Die DOM-Prüfungen ersetzen diesen nicht.
 
@@ -228,11 +254,14 @@ python3 build.py
 Tests benötigen Node.js und für die Jinja-Prüfung zusätzlich Jinja2:
 
 ```bash
-node --test tests/gcode.test.mjs tests/ui.test.mjs
+node --test tests/gcode.test.mjs tests/ui.test.mjs tests/embed.test.mjs
+python3 tests/install_test.py
 python3 tests/macros_test.py
 ```
 
 ## Rückbau
+
+Nur die Mainsail-Einbettung entfernen: Den Block zwischen `PRINT_RESCUE_EMBED_BEGIN` und `PRINT_RESCUE_EMBED_END` aus Mainsails `index.html` entfernen, `print-rescue/mainsail-embed.js` löschen und beim PrintRescue-Eintrag in `.theme/navi.json` wieder `"target": "_blank"` setzen. Bei installiertem Service Worker die zusammengehörigen Mainsail-Dateien `index.html` und `sw.js` aus derselben Sicherung wiederherstellen, sofern zwischenzeitlich kein Mainsail-Update stattgefunden hat; andernfalls die aktuelle Originalversion von Mainsail wieder einspielen. Dann den Browser vollständig neu laden. Dies benötigt keinen Klipper-Neustart.
 
 Bei freiem Druckbett aus der ausgegebenen Sicherung `printer.cfg` und `06_macros.cfg` wiederherstellen. Danach Klipper neu starten.
 Wenn inzwischen andere Konfigurationsänderungen erfolgt sind, nicht die gesamte Sicherung darüberkopieren, sondern nur das Include und den mit `PRINT_RESCUE_Z_GUARD_V1` markierten Block entfernen.

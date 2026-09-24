@@ -1,5 +1,14 @@
 # Änderungen
 
+## 0.1.2 – 24.09.2026 – Testversion
+
+- Optionale Einbettung im Mainsail-Inhaltsbereich mit `--mainsail-embed`. Seitenleiste und Kopfleiste bleiben verfügbar; „Druck retten“ öffnet keinen zusätzlichen Tab.
+- Wechsel zwischen Mainsail und PrintRescue erhält die geladene Datei, Layerauswahl und Prüfsitzung im selben eingebetteten Fenster.
+- `--mainsail-embed --ui-only` ergänzt eine bestehende Installation ohne Änderung der Klipper-/Moonraker-Konfiguration und ohne Diensteneustart.
+- Gesicherte, wiederholbare Ergänzung der Mainsail-Startseite; Aktualisierung ihres Service-Worker-Cache-Eintrags und Behandlung komprimierter Webdateien. Nach Mainsail-Updates lässt sich die Einbettung mit demselben UI-Befehl wiederherstellen.
+- Verbindungsvorbelegung verwendet im eingebetteten Fenster die Mainsail-Adresse. Der Bediener verbindet weiterhin ausdrücklich.
+- 42 Softwaretests bestanden. Wiederanlaufmakros und Reparatur-G-Code-Logik unverändert. Darstellung und Bedienung auf dem echten Mainsail-System stehen noch zur Prüfung aus.
+
 ## 0.1.1 – 24.09.2026 – Testversion
 
 - Git-Installation über `install.py --git-updates` für `JHFexafuse/print-rescue-assistant`.

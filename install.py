@@ -2,6 +2,7 @@
 """Install the reviewed static UI and minimal Klipper integration; no restart."""
 import argparse
 import datetime
+import hashlib
 import json
 import re
 import shutil
@@ -42,15 +43,63 @@ def git_update_settings(root):
         'managed_services: klipper', 'info_tags:', '    desc=PrintRescue', ''
     ])
 
-def navigation_text(path):
+def navigation_text(path, embedded=False):
     entries = json.loads(path.read_text()) if path.exists() else []
     if not isinstance(entries, list) or any(not isinstance(entry, dict) for entry in entries):
         raise ValueError('Die vorhandene .theme/navi.json ist keine Liste von Navigationseinträgen.')
-    if not any(entry.get('href') == '/print-rescue/' for entry in entries):
-        entries.append({'title': 'Druck retten', 'href': '/print-rescue/', 'target': '_blank', 'position': 65})
+    matches = [entry for entry in entries if entry.get('href') == '/print-rescue/']
+    if not matches:
+        entries.append({'title': 'Druck retten', 'href': '/print-rescue/', 'target': '_self' if embedded else '_blank', 'position': 65})
+    elif embedded:
+        for entry in matches: entry['target'] = '_self'
     return json.dumps(entries, ensure_ascii=False, indent=2)+'\n'
 
+def embedded_mainsail_html(text):
+    begin, end = '<!-- PRINT_RESCUE_EMBED_BEGIN -->', '<!-- PRINT_RESCUE_EMBED_END -->'
+    if begin in text or end in text:
+        if text.count(begin) != 1 or text.count(end) != 1 or text.index(begin) > text.index(end):
+            raise ValueError('Unvollständige PrintRescue-Einbettung in der Mainsail-index.html. Keine Änderung vorgenommen.')
+        text = re.sub(re.escape(begin)+r'[\s\S]*?'+re.escape(end)+r'\n?', '', text, count=1)
+    if len(re.findall(r'</body\s*>', text, re.I)) != 1 or not re.search(r'\bid\s*=\s*[\"\']app[\"\']', text):
+        raise ValueError('Die index.html entspricht keiner unterstützten Mainsail-Webseite (app/body fehlt).')
+    block = begin+'\n<script id="print-rescue-loader" src="/print-rescue/mainsail-embed.js" defer></script>\n'+end+'\n'
+    return re.sub(r'</body\s*>', lambda match: block+match[0], text, count=1, flags=re.I)
+
+def embedding_changes(web_root, linked):
+    html = embedded_mainsail_html((web_root/'index.html').read_text(encoding='utf-8'))
+    source = ROOT/'integration/mainsail-embed.js'
+    changes = [
+        (web_root/'index.html', 'web/mainsail-index.html', 'bytes', html.encode()),
+        (web_root/'print-rescue/mainsail-embed.js', 'web/mainsail-embed.js', 'link' if linked else 'bytes',
+         source if linked else source.read_bytes()),
+    ]
+    # nginx may prefer a precompressed copy over the edited HTML. Back up and
+    # remove only those generated variants, letting nginx serve/compress HTML.
+    generated = ['index.html']
+    worker = web_root/'sw.js'
+    if worker.exists():
+        # Workbox precaches Mainsail's index.html. Give only that entry a new
+        # revision so a service-worker update fetches the amended HTML.
+        original = worker.read_text(encoding='utf-8')
+        entry = r'\{\s*(?:[\"\']url[\"\']|url)\s*:\s*[\"\']/?index\.html[\"\']\s*,\s*(?:[\"\']revision[\"\']|revision)\s*:\s*([\"\'])[A-Za-z0-9_-]+\1\s*\}|\{\s*(?:[\"\']revision[\"\']|revision)\s*:\s*([\"\'])[A-Za-z0-9_-]+\2\s*,\s*(?:[\"\']url[\"\']|url)\s*:\s*[\"\']/?index\.html[\"\']\s*\}'
+        revision = hashlib.sha256(html.encode()).hexdigest()[:32]
+        replacement = json.dumps({'url': 'index.html', 'revision': revision}, separators=(',', ':'))
+        patched, count = re.subn(entry, lambda match: replacement, original)
+        if count != 1:
+            raise ValueError('Mainsail-sw.js hat ein unbekanntes Cache-Format. Einbettung nicht installiert; diese Datei zuerst prüfen lassen.')
+        changes.append((worker, 'web/mainsail-sw.js', 'bytes', patched.encode()))
+        generated.append('sw.js')
+    for name in generated:
+        for extension in ('.gz', '.br'):
+            path = web_root/(name+extension)
+            if path.exists() or path.is_symlink():
+                changes.append((path, 'web/mainsail-'+name+extension, 'delete', None))
+    return changes
+
 def write_atomic(path, kind, value, mode=0o644):
+    if kind == 'delete':
+        path.unlink(missing_ok=True)
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, name = tempfile.mkstemp(prefix='.print-rescue-', dir=path.parent)
     temporary = Path(name)
@@ -145,14 +194,52 @@ def patch_homing(text):
 '''
     return text.replace(needle, needle + '\n' + guard, 1)
 
-def install(config_dir, web_root, dry_run=False, git_updates=False, mainsail_link=False):
+def finish_installation(changes, config_dir, web_root, dry_run):
+    for path, relative, kind, value in changes:
+        base = web_root if relative.startswith('web/') else config_dir
+        if not path.parent.resolve().is_relative_to(base):
+            raise ValueError(f'Zielordner führt über einen Symlink aus dem Installationsordner heraus: {path.parent}')
+        if path.exists() and path.is_dir(): raise ValueError(f'Ziel ist ein Ordner: {path}')
+    if dry_run:
+        print('Prüfung erfolgreich. --dry-run: keine Dateien geändert.')
+        return
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d-%H%M%S-%f')
+    backup = config_dir/('print-rescue-backup-'+stamp)
+    apply_changes(changes, backup)
+    print('Sicherung:', backup)
+
+def install_ui(config_dir, web_root, dry_run):
+    target = web_root/'print-rescue/index.html'
+    macro = config_dir/'print_rescue.cfg'
+    if not macro.is_file():
+        raise ValueError('--ui-only benötigt eine vorhandene PrintRescue-Installation. Zuerst die Erstinstallation durchführen.')
+    linked = target.is_symlink() if target.exists() else macro.is_symlink()
+    if (target.is_symlink() and target.resolve() != ROOT/'index.html') or (linked and macro.is_symlink() and macro.resolve() != ROOT/'integration/print_rescue.cfg'):
+        raise ValueError('Die vorhandene Oberfläche verweist auf einen anderen Checkout. Dessen install.py verwenden.')
+    navi = config_dir/'.theme/navi.json'
+    changes = [
+        (target, 'web/index.html', 'link' if linked else 'bytes', ROOT/'index.html' if linked else (ROOT/'index.html').read_bytes()),
+        (navi, '.theme/navi.json', 'bytes', navigation_text(navi, embedded=True).encode()),
+        *embedding_changes(web_root, linked),
+    ]
+    print('Nur Oberfläche: PrintRescue einbetten und Mainsail-Menü anpassen.')
+    finish_installation(changes, config_dir, web_root, dry_run)
+    if not dry_run:
+        print('Installiert. Mainsail im Browser vollständig neu laden (Strg+F5).')
+        print('Keine Klipper-/Moonraker-Konfiguration geändert; kein Diensteneustart erforderlich oder ausgeführt.')
+
+def install(config_dir, web_root, dry_run=False, git_updates=False, mainsail_link=False, mainsail_embed=False, ui_only=False):
     config_dir = config_dir.expanduser().resolve()
     web_root = web_root.expanduser().resolve()
+    if not web_root.is_dir() or not (web_root/'index.html').is_file():
+        raise ValueError('--web-root muss auf den vorhandenen Mainsail-Webordner mit index.html zeigen.')
+    if ui_only:
+        if not mainsail_embed or git_updates or mainsail_link:
+            raise ValueError('--ui-only zusammen mit --mainsail-embed verwenden; --git-updates und --mainsail-link weglassen.')
+        return install_ui(config_dir, web_root, dry_run)
     macros_path, printer_path = config_dir/'06_macros.cfg', config_dir/'printer.cfg'
     if not macros_path.is_file() or not printer_path.is_file():
         raise ValueError('printer.cfg und 06_macros.cfg müssen im Konfigurationsordner vorhanden sein.')
-    if not web_root.is_dir() or not (web_root/'index.html').is_file():
-        raise ValueError('--web-root muss auf den vorhandenen Mainsail-Webordner mit index.html zeigen.')
     profile = json.loads((ROOT/'integration/profile.json').read_text())
     macros = macros_path.read_text()
     sections_now = sections(macros)
@@ -204,26 +291,18 @@ def install(config_dir, web_root, dry_run=False, git_updates=False, mainsail_lin
             (moonraker_path, 'moonraker.conf', 'bytes', moonraker_text.encode()),
             (update_path, 'print_rescue_updates.conf', 'bytes', update_text.encode()),
         ]
-    if mainsail_link or git_updates:
+    if mainsail_link or git_updates or mainsail_embed:
         navi_path = config_dir/'.theme/navi.json'
-        changes.append((navi_path, '.theme/navi.json', 'bytes', navigation_text(navi_path).encode()))
-    for path, relative, kind, value in changes:
-        base = web_root if relative.startswith('web/') else config_dir
-        if not path.parent.resolve().is_relative_to(base):
-            raise ValueError(f'Zielordner führt über einen Symlink aus dem Installationsordner heraus: {path.parent}')
-        if path.exists() and path.is_dir(): raise ValueError(f'Ziel ist ein Ordner: {path}')
+        changes.append((navi_path, '.theme/navi.json', 'bytes', navigation_text(navi_path, mainsail_embed).encode()))
+    if mainsail_embed: changes += embedding_changes(web_root, git_updates)
     print('Zielkonfiguration:', config_dir)
     print('Weboberfläche:', target/'index.html')
     print('Änderungen: Homing-Sperre, separates print_rescue.cfg, ein Include, Unterordner print-rescue.')
     if git_updates: print('Git-Modus: verknüpfte Makros/Oberfläche, Moonraker-Update-Eintrag mit managed_services: klipper.')
-    if mainsail_link or git_updates: print('Mainsail-Menü: Druck retten (vorhandene Einträge bleiben erhalten).')
-    if dry_run:
-        print('Prüfung erfolgreich. --dry-run: keine Dateien geändert.')
-        return
-    stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d-%H%M%S-%f')
-    backup = config_dir/('print-rescue-backup-'+stamp)
-    apply_changes(changes, backup)
-    print('Sicherung:', backup)
+    if mainsail_link or git_updates or mainsail_embed: print('Mainsail-Menü: Druck retten (vorhandene Einträge bleiben erhalten).')
+    if mainsail_embed: print('Mainsail-Einbettung: Loader in index.html ergänzen; eventuell vorhandene komprimierte index.html-Kopien sichern und entfernen.')
+    finish_installation(changes, config_dir, web_root, dry_run)
+    if dry_run: return
     print('Installiert. Kein Drucker-Neustart wurde ausgeführt.')
     print('Klipper RESTART nur bei freiem Druckbett und ohne laufenden Druck ausführen.')
     if git_updates: print('Zur ersten Registrierung anschließend Moonraker neu starten. Spätere Updates erfolgen über Mainsail.')
@@ -236,6 +315,8 @@ if __name__ == '__main__':
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--git-updates', action='store_true', help='Git-Checkout verknüpfen und Moonraker-Update-Manager samt Mainsail-Menü einrichten.')
     parser.add_argument('--mainsail-link', action='store_true', help='Auch im ZIP-Modus einen Mainsail-Menüeintrag ergänzen.')
+    parser.add_argument('--mainsail-embed', action='store_true', help='PrintRescue im Mainsail-Inhaltsbereich öffnen (ergänzt die Mainsail-index.html).')
+    parser.add_argument('--ui-only', action='store_true', help='Mit --mainsail-embed nur die bestehende Oberfläche aktualisieren; keine Klipper-/Moonraker-Konfiguration ändern.')
     args = parser.parse_args()
-    try: install(args.config_dir,args.web_root,args.dry_run,args.git_updates,args.mainsail_link)
+    try: install(args.config_dir,args.web_root,args.dry_run,args.git_updates,args.mainsail_link,args.mainsail_embed,args.ui_only)
     except (OSError,ValueError,KeyError,subprocess.SubprocessError) as error: parser.exit(1, str(error)+'\n')

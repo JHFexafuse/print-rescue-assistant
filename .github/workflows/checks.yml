@@ -32,7 +32,7 @@ jobs:
           python build.py
           git diff --exit-code -- index.html
       - name: Parser and interface tests
-        run: node --test tests/gcode.test.mjs tests/ui.test.mjs
+        run: node --test tests/gcode.test.mjs tests/ui.test.mjs tests/embed.test.mjs
       - name: Installer and migration tests
         run: python tests/install_test.py
       - name: Klipper macro simulation

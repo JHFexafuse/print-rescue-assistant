@@ -11,7 +11,7 @@
 <main class="app">
   <header class="top">
     <div class="brand"><svg class="brand-icon" viewBox="0 0 40 46" aria-hidden="true"><path d="M20 3 36 12 20 21 4 12Z" fill="none" stroke="#ffb45b" stroke-width="2"/><path d="m4 20 16 9 16-9m-32 8 16 9 16-9m-32 8 16 9 16-9" fill="none" stroke="#638598" stroke-width="1.6"/></svg><div><p class="eyebrow">Printwars / Werkzeuge</p><h1>Druck retten.</h1></div></div>
-    <div class="top-actions"><span class="badge">v0.1.1 · TESTVERSION</span><button id="connect-button">Drucker verbinden</button><button id="help-button" aria-label="Bedienung und Hinweise öffnen">?</button></div>
+    <div class="top-actions"><span class="badge">v0.1.2 · TESTVERSION</span><button id="connect-button">Drucker verbinden</button><button id="help-button" aria-label="Bedienung und Hinweise öffnen">?</button></div>
   </header>
   <div class="notice"><span><i class="dot"></i><strong id="connection-state">Lokale Vorschau</strong> · <span id="connection-detail">Keine Verbindung zum Drucker</span></span><span>V1 setzt eine erhaltene Z-Referenz voraus.</span></div>
   <div class="layout">
@@ -791,7 +791,12 @@ function refreshControls(){
   $('machine-status').classList.toggle('good',!ready||phase===1||phase===2);
 }
 
-$('connect-button').addEventListener('click',()=>{$('api-url').value=apiBase||(location.protocol.startsWith('http')?location.origin:'');$('connection-dialog').showModal();});
+$('connect-button').addEventListener('click',()=>{
+  // srcdoc embedding inherits Mainsail's base URI; location is about:srcdoc.
+  const base=new URL(document.baseURI||location.href||'file:///');
+  $('api-url').value=apiBase||(base.protocol.startsWith('http')?base.origin:'');
+  $('connection-dialog').showModal();
+});
 $('connect-close').addEventListener('click',()=>$('connection-dialog').close());
 $('connect-do').addEventListener('click',async()=>{
   if(machineBusy()){$('connect-error').textContent='Verbindung während einer aktiven Prüfung nicht wechseln.';return;}

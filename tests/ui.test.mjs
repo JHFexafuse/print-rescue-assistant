@@ -45,7 +45,7 @@ async function createApp(){
  }
  elements.get('parser-source').textContent=parser;
  const buttons=['iso','top','front'].map(v=>{const el=new Element('view-'+v);el.dataset.view=v;return el;});
- const doc={getElementById:id=>elements.get(id),querySelectorAll:()=>buttons,addEventListener(){},createElement:()=>new Element('generated')};
+ const doc={baseURI:'file:///index.html',getElementById:id=>elements.get(id),querySelectorAll:()=>buttons,addEventListener(){},createElement:()=>new Element('generated')};
  const blobs=new Map();let bid=0;
  class TestURL extends URL{static createObjectURL(blob){const id='blob:test-'+(++bid);blobs.set(id,blob);return id;}static revokeObjectURL(id){blobs.delete(id);}}
  class Worker{
@@ -91,6 +91,11 @@ test('Page boots, demo has 30 ghost layers, decimal comma search and stepping wo
  assert.equal(a.elements.get('active-layer').textContent,'60');
  await a.elements.get('next').emit('click');assert.equal(a.elements.get('active-layer').textContent,'61');
  assert.equal(a.elements.get('inspect').disabled,true);assert.equal(a.requests.length,0);
+ // srcdoc has about:srcdoc as its location but inherits the Mainsail base URI.
+ a.run("document.baseURI='http://printer.test/console'; location.protocol='about:'; location.origin='null';");
+ await a.elements.get('connect-button').emit('click');
+ assert.equal(a.elements.get('api-url').value,'http://printer.test');
+ assert.equal(a.requests.length,0);
 });
 test('Real file → verify profile → inspect → repair upload → XY home → print at 20%',async()=>{
  const a=await createApp();a.context.fixture=fixture;await a.run("loadText(fixture,'part.gcode',false)");await waitUntil(()=>a.elements.get('file-stats').textContent.startsWith('3 Schichten'));

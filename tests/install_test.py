@@ -25,7 +25,7 @@ class InstallTests(unittest.TestCase):
         self.config = self.base/'printer_data/config'
         self.web = self.base/'mainsail'
         for path in (self.repo/'integration', self.config, self.web): path.mkdir(parents=True)
-        for name in ('install.py', '.gitignore', 'index.html', 'integration/profile.json', 'integration/print_rescue.cfg'):
+        for name in ('install.py', '.gitignore', 'index.html', 'integration/profile.json', 'integration/print_rescue.cfg', 'integration/mainsail-embed.js'):
             shutil.copy2(ROOT/name, self.repo/name)
         self.git('init', '-b', 'main')
         self.git('config', 'user.name', 'PrintRescue Test')
@@ -41,7 +41,8 @@ class InstallTests(unittest.TestCase):
         (self.config/'03_steppers.cfg').write_text('[output_pin _STEPPER_RESET]\npin: y:PA1\n')
         (self.config/'printer.cfg').write_text('[include 06_macros.cfg]\n\n#*# <---------------------- SAVE_CONFIG ---------------------->\n#*# test\n')
         (self.config/'moonraker.conf').write_text('[server]\nport: 7125\n\n[update_manager mainsail-config]\ntype: git_repo\n')
-        (self.web/'index.html').write_text('<h1>Existing Mainsail</h1>')
+        self.mainsail_html = '<!doctype html><html><body><div id="app"></div><script src="/assets/mainsail.js"></script></body></html>'
+        (self.web/'index.html').write_text(self.mainsail_html)
 
     def git(self, *args):
         return subprocess.run(['git', '-C', str(self.repo), *args], check=True, capture_output=True, text=True, timeout=15).stdout.strip()
@@ -68,7 +69,7 @@ class InstallTests(unittest.TestCase):
         self.install(git_updates=True)
         self.assertEqual((self.config/'print_rescue.cfg').resolve(), self.repo/'integration/print_rescue.cfg')
         self.assertEqual((self.web/'print-rescue/index.html').resolve(), self.repo/'index.html')
-        self.assertEqual((self.web/'index.html').read_text(), '<h1>Existing Mainsail</h1>')
+        self.assertEqual((self.web/'index.html').read_text(), self.mainsail_html)
         navi = json.loads((self.config/'.theme/navi.json').read_text())
         self.assertEqual(navi[0], other)
         self.assertEqual(navi[1]['href'], '/print-rescue/')
@@ -150,6 +151,104 @@ class InstallTests(unittest.TestCase):
         before = self.snapshot()
         with self.assertRaises(ValueError) as error: self.install(git_updates=True)
         self.assertNotIn('private-test-token', str(error.exception))
+        self.assertEqual(self.snapshot(), before)
+
+    def test_ui_embedding_keeps_printer_configs_and_navigation_customizations(self):
+        self.install(git_updates=True)
+        names = ('06_macros.cfg', '03_steppers.cfg', 'printer.cfg', 'print_rescue.cfg', 'moonraker.conf', 'print_rescue_updates.conf')
+        before = {name: (self.config/name).read_bytes() for name in names}
+        navi_path = self.config/'.theme/navi.json'
+        other = {'title': 'Werkstatt', 'href': 'https://example.invalid/', 'target': '_blank'}
+        custom = {'title': 'Meine Rettung', 'href': '/print-rescue/', 'target': '_blank', 'icon': 'custom-icon', 'position': 42}
+        navi_path.write_text(json.dumps([other, custom]))
+        (self.web/'index.html.gz').write_bytes(b'old compressed HTML')
+        (self.web/'index.html.br').write_bytes(b'old brotli HTML')
+        snapshot = self.snapshot()
+        self.install(ui_only=True, mainsail_embed=True, dry_run=True)
+        self.assertEqual(self.snapshot(), snapshot)
+        self.install(ui_only=True, mainsail_embed=True)
+        self.assertEqual({name: (self.config/name).read_bytes() for name in names}, before)
+        self.assertTrue((self.config/'print_rescue.cfg').is_symlink())
+        self.assertEqual((self.web/'print-rescue/mainsail-embed.js').resolve(), self.repo/'integration/mainsail-embed.js')
+        html = (self.web/'index.html').read_text()
+        self.assertIn('src="/assets/mainsail.js"', html)
+        self.assertEqual(html.count('id="print-rescue-loader"'), 1)
+        self.assertLess(html.index('id="print-rescue-loader"'), html.index('</body>'))
+        self.assertEqual(json.loads(navi_path.read_text()), [other, {**custom, 'target': '_self'}])
+        self.assertFalse((self.web/'index.html.gz').exists())
+        self.assertFalse((self.web/'index.html.br').exists())
+        backup = sorted(self.config.glob('print-rescue-backup-*'))[-1]
+        self.assertEqual((backup/'web/mainsail-index.html').read_text(), self.mainsail_html)
+        self.assertEqual((backup/'web/mainsail-index.html.gz').read_bytes(), b'old compressed HTML')
+        self.assertEqual((backup/'web/mainsail-index.html.br').read_bytes(), b'old brotli HTML')
+        self.assertEqual(self.git('status', '--porcelain'), '')
+        self.install(ui_only=True, mainsail_embed=True)
+        self.assertEqual((self.web/'index.html').read_text(), html)
+        # Simulate Mainsail replacing its own HTML and clearing the loader.
+        (self.web/'index.html').write_text(self.mainsail_html)
+        shutil.rmtree(self.web/'print-rescue')
+        self.install(ui_only=True, mainsail_embed=True)
+        self.assertEqual((self.web/'index.html').read_text(), html)
+        self.assertTrue((self.web/'print-rescue/mainsail-embed.js').is_file())
+        self.assertEqual((self.web/'print-rescue/index.html').resolve(), self.repo/'index.html')
+
+    def test_full_embedding_and_ui_only_zip_mode(self):
+        self.install(mainsail_embed=True)
+        self.assertFalse((self.web/'print-rescue/mainsail-embed.js').is_symlink())
+        self.install(ui_only=True, mainsail_embed=True)
+        self.assertEqual((self.web/'print-rescue/mainsail-embed.js').read_bytes(), (self.repo/'integration/mainsail-embed.js').read_bytes())
+        self.assertEqual((self.web/'index.html').read_text().count('id="print-rescue-loader"'), 1)
+
+    def test_unsupported_html_or_partial_marker_aborts_before_changes(self):
+        self.install()
+        for html in ('<body>Not Mainsail</body>', '<div id="app"></div>', self.mainsail_html+'<!-- PRINT_RESCUE_EMBED_BEGIN -->'):
+            (self.web/'index.html').write_text(html)
+            before = self.snapshot()
+            with self.assertRaises(ValueError): self.install(ui_only=True, mainsail_embed=True)
+            self.assertEqual(self.snapshot(), before)
+
+    def test_ui_only_requires_existing_installation_and_cannot_change_updater(self):
+        before = self.snapshot()
+        for kwargs in ({'ui_only': True}, {'ui_only': True, 'mainsail_embed': True},
+                       {'ui_only': True, 'mainsail_embed': True, 'git_updates': True}):
+            with self.assertRaises(ValueError): self.install(**kwargs)
+            self.assertEqual(self.snapshot(), before)
+
+    def test_failed_embedding_restores_mainsail_and_compressed_variants(self):
+        self.install(git_updates=True)
+        (self.web/'index.html.gz').write_bytes(b'gzip original')
+        (self.web/'index.html.br').write_bytes(b'brotli original')
+        before = self.snapshot()
+        original_write = self.module.write_atomic
+        failed = False
+        def fail_once(path, kind, *args, **kwargs):
+            nonlocal failed
+            if path.name == 'index.html.br' and kind == 'delete' and not failed:
+                failed = True
+                raise OSError('simulated disk error')
+            return original_write(path, kind, *args, **kwargs)
+        with patch.object(self.module, 'write_atomic', side_effect=fail_once):
+            with self.assertRaisesRegex(OSError, 'simulated'): self.install(ui_only=True, mainsail_embed=True)
+        relevant = lambda snapshot: {key: value for key, value in snapshot.items() if 'print-rescue-backup-' not in key}
+        self.assertEqual(relevant(self.snapshot()), relevant(before))
+
+    def test_service_worker_refreshes_only_the_mainsail_html_revision(self):
+        self.install()
+        path = self.web/'sw.js'
+        variants = ('{url:"index.html",revision:"old-123"}', '{"revision":"old-123","url":"/index.html"}',
+                    "{'url':'index.html','revision':'old-123'}")
+        for entry in variants:
+            original = 'precacheAndRoute(['+entry+', {url:"assets/app.js",revision:"retain"}]);'
+            path.write_text(original)
+            self.install(ui_only=True, mainsail_embed=True)
+            updated = path.read_text()
+            self.assertNotIn('old-123', updated)
+            self.assertIn('{url:"assets/app.js",revision:"retain"}', updated)
+            self.install(ui_only=True, mainsail_embed=True)
+            self.assertEqual(path.read_text(), updated)
+        path.write_text('An unknown service worker')
+        before = self.snapshot()
+        with self.assertRaisesRegex(ValueError, 'Cache-Format'): self.install(ui_only=True, mainsail_embed=True)
         self.assertEqual(self.snapshot(), before)
 
 

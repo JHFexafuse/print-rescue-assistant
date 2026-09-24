@@ -51,7 +51,12 @@ function refreshControls(){
   $('machine-status').classList.toggle('good',!ready||phase===1||phase===2);
 }
 
-$('connect-button').addEventListener('click',()=>{$('api-url').value=apiBase||(location.protocol.startsWith('http')?location.origin:'');$('connection-dialog').showModal();});
+$('connect-button').addEventListener('click',()=>{
+  // srcdoc embedding inherits Mainsail's base URI; location is about:srcdoc.
+  const base=new URL(document.baseURI||location.href||'file:///');
+  $('api-url').value=apiBase||(base.protocol.startsWith('http')?base.origin:'');
+  $('connection-dialog').showModal();
+});
 $('connect-close').addEventListener('click',()=>$('connection-dialog').close());
 $('connect-do').addEventListener('click',async()=>{
   if(machineBusy()){$('connect-error').textContent='Verbindung während einer aktiven Prüfung nicht wechseln.';return;}
