@@ -1,0 +1,17 @@
+--- 06_macros.cfg
++++ 06_macros.cfg
+@@ -1002,6 +1002,14 @@
+     {% set z_cold = 'z' not in th.homed_axes %}
+     {% set do_z   = all_ax or want_z or z_cold %}
+ 
++    # PRINT_RESCUE_Z_GUARD_V1
++    {% if 'gcode_macro _PR_STATE' in printer %}
++        {% if printer['gcode_macro _PR_STATE'].active|int == 1 and do_z %}
++            {action_raise_error("Print Rescue: Z-Homing ist waehrend einer Reparatursitzung gesperrt. Z-Referenz muss erhalten sein.")}
++        {% endif %}
++    {% endif %}
++
++
+     SAVE_GCODE_STATE NAME=_G28_STATE
+     G90
+ 

@@ -1,0 +1,169 @@
+{
+  "layers": 2154,
+  "segments": 3817504,
+  "bounds": {
+    "minX": 289.424,
+    "minY": 243.234,
+    "minZ": 0.6,
+    "maxX": 850.47,
+    "maxY": 605.814,
+    "maxZ": 456.6
+  },
+  "issues": [
+    {
+      "key": "macros",
+      "message": "Makros in der Datei: SET_PRINT_STATS_INFO, PRINT_END. Ihre Bewegungen sind nicht Bestandteil der Vorschau.",
+      "line": 6712951,
+      "blocksPlan": false
+    }
+  ],
+  "checkpoints": [
+    {
+      "i": 0,
+      "z": 0.6,
+      "line": 517,
+      "before": {
+        "x": 551.014,
+        "y": 546.501,
+        "z": 0.6,
+        "e": 3.4,
+        "abs": true,
+        "relativeE": false,
+        "feed": 3000,
+        "hotend": 245,
+        "bed": 77,
+        "fan": 0,
+        "accel": 1000,
+        "flow": 100,
+        "objectStart": "",
+        "debt": 0
+      }
+    },
+    {
+      "i": 1,
+      "z": 0.9,
+      "line": 4167,
+      "before": {
+        "x": 401.508,
+        "y": 289.248,
+        "z": 0.9,
+        "e": 3.4,
+        "abs": true,
+        "relativeE": false,
+        "feed": 7800,
+        "hotend": 230,
+        "bed": 77,
+        "fan": 0,
+        "accel": 1000,
+        "flow": 100,
+        "objectStart": "EXCLUDE_OBJECT_START NAME='OBI_v3_Kopf_stl'",
+        "debt": 0
+      }
+    },
+    {
+      "i": 2,
+      "z": 1,
+      "line": 4946,
+      "before": {
+        "x": 569.001,
+        "y": 559.317,
+        "z": 1,
+        "e": 3.4,
+        "abs": true,
+        "relativeE": false,
+        "feed": 1730.902,
+        "hotend": 230,
+        "bed": 77,
+        "fan": 0,
+        "accel": 500,
+        "flow": 100,
+        "objectStart": "EXCLUDE_OBJECT_START NAME='OBI_v3_Kopf_stl'",
+        "debt": 0
+      }
+    },
+    {
+      "i": 999,
+      "z": 200.5,
+      "line": 2277123,
+      "before": {
+        "x": 347.38,
+        "y": 427.488,
+        "z": 200.5,
+        "e": 3.4,
+        "abs": true,
+        "relativeE": false,
+        "feed": 7800,
+        "hotend": 230,
+        "bed": 77,
+        "fan": 255,
+        "accel": 1000,
+        "flow": 100,
+        "objectStart": "EXCLUDE_OBJECT_START NAME='OBI_v3_Kopf_stl'",
+        "debt": 0
+      }
+    },
+    {
+      "i": 1000,
+      "z": 200.6,
+      "line": 2277307,
+      "before": {
+        "x": 576.213,
+        "y": 375.371,
+        "z": 200.6,
+        "e": 3.4,
+        "abs": true,
+        "relativeE": false,
+        "feed": 2656.719,
+        "hotend": 230,
+        "bed": 77,
+        "fan": 255,
+        "accel": 1000,
+        "flow": 100,
+        "objectStart": "EXCLUDE_OBJECT_START NAME='OBI_v3_Kopf_stl'",
+        "debt": 0
+      }
+    },
+    {
+      "i": 2000,
+      "z": 410.2,
+      "line": 5986566,
+      "before": {
+        "x": 591.694,
+        "y": 355.212,
+        "z": 410.2,
+        "e": 3.4,
+        "abs": true,
+        "relativeE": false,
+        "feed": 6000,
+        "hotend": 230,
+        "bed": 77,
+        "fan": 255,
+        "accel": 1000,
+        "flow": 100,
+        "objectStart": "EXCLUDE_OBJECT_START NAME='OBI_v3_Kopf_stl'",
+        "debt": 0
+      }
+    },
+    {
+      "i": 2153,
+      "z": 456.6,
+      "line": 6712525,
+      "before": {
+        "x": 559.28,
+        "y": 382.657,
+        "z": 456.6,
+        "e": 3.4,
+        "abs": true,
+        "relativeE": false,
+        "feed": 600,
+        "hotend": 230,
+        "bed": 77,
+        "fan": 255,
+        "accel": 500,
+        "flow": 100,
+        "objectStart": "EXCLUDE_OBJECT_START NAME='OBI_v3_Kopf_stl'",
+        "debt": 0
+      }
+    }
+  ]
+}

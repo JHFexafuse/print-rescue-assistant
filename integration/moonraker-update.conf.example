@@ -1,0 +1,11 @@
+# Beispiel. Pfad an die Installation anpassen.
+# install.py --git-updates erzeugt diesen Eintrag mit den tatsächlichen Werten.
+[update_manager print_rescue]
+type: git_repo
+channel: dev
+primary_branch: main
+path: ~/print-rescue
+origin: https://github.com/JHFexafuse/print-rescue-assistant.git
+managed_services: klipper
+info_tags:
+    desc=PrintRescue
