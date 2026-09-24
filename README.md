@@ -1,4 +1,4 @@
-# PrintRescue Assistant 0.1.3 – Printwars
+# PrintRescue Assistant 0.1.4 – Printwars
 
 Erste installierbare Testversion für die am 24.09.2026 bereitgestellte Konfiguration.
 Sie vereinfacht die Wiederaufnahme eines beschädigten Drucks bei **erhaltener Z-Referenz**.
@@ -224,6 +224,8 @@ Das Mesh und vorhandene Koordinatenoffsets werden nicht neu kalibriert. Die Soft
 
 ## Grenzen der ersten Version
 
+Ist „Höhe anfahren“ wegen der G-Code-Prüfung gesperrt, zeigt Version 0.1.4 den konkreten Grund und gegebenenfalls die betroffene Zeile direkt am Prüfschritt. Alle Befunde stehen unter **Hinweise zur Datei**; dieser Bereich öffnet sich bei Sperren automatisch. Für eine Prüfung bitte die dortigen Sperrgründe und den betreffenden G-Code bereitstellen. **Auswahl protokollieren** exportiert die Befunde ebenfalls. Reine Hinweise sperren den Ablauf nicht. Für dieses Oberflächenupdate einer bereits eingebetteten Git-Installation genügt `git -C ~/print-rescue pull --ff-only` und anschließend vollständiges Neuladen nach Abschluss einer aktiven Handprüfung; kein Diensteneustart ist erforderlich.
+
 - Geprüft am gelieferten PrusaSlicer-2.9.4-G-Code `OBI_3_Gesicht.gcode` und dem gelieferten Druckerprofil. Weitere Slicer-/Druckerprofile müssen anhand ihrer Dateien geprüft werden.
 - Ein Extruder, planare Schichten. Die Unterstützung von Stützen auf Zwischenhöhen ist enthalten.
 - Werkzeugwechsel, Firmware-Retract, nichtplanare/Spiral-Drucke, sequenzieller Objektdruck und unerkannte Befehle verhindern die Reparaturfreigabe.
@@ -250,6 +252,7 @@ V2 ist für den Wiederanlauf nach Abschaltung vorgesehen: kontrollierte manuelle
 - Version 0.1.1: neun zusätzliche Installationstests für ZIP-zu-Git-Migration, unveränderte Mainsail-Startseite, vorhandene Menüpunkte, Dateiverknüpfungen nach einem simulierten Git-Update, Branch-Auswahl, ungültige Eingaben und Wiederherstellung nach Schreibfehler. Insgesamt 30 automatisierte Tests bestanden.
 - Version 0.1.2: sechs Tests der Einbettung mit simuliertem DOM und sechs zusätzliche Installer-Tests. Geprüft werden Navigation, Erhalt derselben eingebetteten Sitzung, Abstand zu Seitenleiste/Kopfleiste, Verbindungsverlust, Ladefehler, reine UI-Installation ohne Änderung der Druckerkonfiguration, Cache-Anpassung und Wiederherstellung nach Schreibfehler. Die Verbindungsvorbelegung innerhalb der eingebetteten Seite ist ebenfalls geprüft. Insgesamt 42 automatisierte Tests bestanden.
 - Version 0.1.3: Theme-Wechsel bei erhaltener eingebetteter Sitzung sowie getrennte Prusa-Merkmale bei unveränderter Geometrie und identischem Reparatur-G-Code geprüft. Die Legende wird im bestehenden Oberflächentest mitgeprüft. Insgesamt 44 automatisierte Tests bestanden. Ein visueller Vergleich im echten Mainsail-Browser steht weiter aus.
+- Version 0.1.4: Sichtbarer Sperrgrund mit Zeile, automatisch geöffnete Dateihinweise und weiterhin gesperrte Bewegung trotz gesetzter Bestätigung geprüft. Nach Laden einer Datei mit ausschließlich Hinweisen ist die Prüfung wieder freigegeben. Insgesamt 45 automatisierte Tests bestanden; die ursprüngliche Beispieldatei löst weiterhin keine G-Code-Sperre aus.
 
 Die Cloud-Browserumgebung hat den Zugriff auf die lokale HTML-Datei gesperrt. Deshalb wurde kein erfolgreicher visueller Browsercheck behauptet. Die DOM-Prüfungen ersetzen diesen nicht.
 

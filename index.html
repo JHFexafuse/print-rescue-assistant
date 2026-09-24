@@ -136,6 +136,8 @@ small,.muted { color:var(--muted); }
 details:not(.preview-legend) { margin-top:16px; padding:12px 16px; border:1px solid var(--line); border-radius:4px; background:var(--panel); color:var(--muted); font-size:12px; }
 summary { cursor:pointer; }
 details ul { margin:10px 0 0; padding-left:18px; font-size:12px; line-height:1.65; }
+#issues .blocking { color:var(--text); font-weight:500; }
+#issues .blocking::marker { color:var(--error); }
 #drop-overlay { position:fixed; inset:12px; z-index:10; display:grid; place-content:center; border:2px dashed var(--accent); border-radius:4px; background:var(--panel); color:var(--text); font-size:22px; text-align:center; }
 dialog { max-width:700px; width:calc(100% - 40px); max-height:90vh; overflow:auto; padding:24px; border:1px solid var(--line); border-radius:4px; background:var(--panel); color:var(--text); box-shadow:0 12px 40px #0006; }
 dialog::backdrop { background:#0008; }
@@ -196,7 +198,7 @@ dialog code { color:var(--accent); }
 <main class="app">
   <header class="top">
     <div class="brand"><svg class="brand-icon" viewBox="0 0 40 46" aria-hidden="true"><path d="M20 3 36 12 20 21 4 12Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="m4 20 16 9 16-9m-32 8 16 9 16-9m-32 8 16 9 16-9" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><div><h1>Druck retten</h1></div></div>
-    <div class="top-actions"><span class="badge">v0.1.3 · TESTVERSION</span><button id="connect-button">Drucker verbinden</button><button id="help-button" aria-label="Bedienung und Hinweise öffnen">?</button></div>
+    <div class="top-actions"><span class="badge">v0.1.4 · TESTVERSION</span><button id="connect-button">Drucker verbinden</button><button id="help-button" aria-label="Bedienung und Hinweise öffnen">?</button></div>
   </header>
   <div class="notice"><span><i class="dot"></i><strong id="connection-state">Lokale Vorschau</strong> · <span id="connection-detail">Keine Verbindung zum Drucker</span></span><span>V1 setzt eine erhaltene Z-Referenz voraus.</span></div>
   <div class="layout">
@@ -215,7 +217,7 @@ dialog code { color:var(--accent); }
   </div>
   <div id="message" class="message" role="status" aria-live="polite" hidden></div>
   <div class="bottom"><span id="compatibility">Schichterkennung wird geladen …</span><span>Erste Extrusionszeile: <span id="line-number" class="mono">—</span></span><button id="export">Auswahl protokollieren</button></div>
-  <details><summary id="notes-title">Hinweise zur Datei</summary><ul id="issues"></ul></details>
+  <details id="file-notes"><summary id="notes-title">Hinweise zur Datei</summary><ul id="issues"></ul></details>
 </main>
 <dialog id="help"><h2>Druck retten · V1</h2><p>Öffne deinen unkomprimierten G-Code. Die Millimetereingabe wählt die nächstgelegene tatsächlich gedruckte Schicht. Die Auswahl bezeichnet immer die <strong>letzte vollständig gedruckte Schicht</strong>. Gedruckt wird ab der nächsten vorhandenen Schicht, auch bei abweichenden Schichthöhen.</p><p>Die aktive Schicht erscheint farbig, die darunterliegenden Schichten verblasst. Mit Mausrad und Ziehen kannst du dich orientieren. Die Gitterebene zeigt den unteren Rand des sichtbaren Ausschnitts; sie ist bei höheren Ausschnitten nicht das Druckbett.</p><p>Die Druckersteuerung benötigt das beiliegende Klipper-Modul und die geprüfte Homing-Sperre. Die HTML-Datei allein führt keine Installation durch. Sie arbeitet mit Moonraker und sendet erst nach Betätigen der entsprechenden Schaltflächen Bewegungsbefehle.</p><p>V1: erhaltene Z-Referenz, ausgerichtete Gantry, ein Extruder, planare Schichten und unterstützte G-Code-Befehle. Z-Rekonstruktion nach Abschaltung, einzelne Z-Stepper und ausgeschlossene Objekte sind noch nicht unterstützt.</p><p>Unterstützt sind Textdateien bis 256 MiB und 12 Millionen Vorschausegmente. G2/G3-Bögen werden in der Vorschau in kurze Linien zerlegt. Die Demo ist synthetisch und kann nicht an einen Drucker gesendet werden.</p><button id="close-help" class="primary full">Verstanden</button></dialog>
 <dialog id="connection-dialog"><h2>Mit Moonraker verbinden</h2><p>Auf dem Drucker installiert wird dieselbe Adresse wie für Mainsail verwendet. Bei lokal geöffneter HTML-Datei muss Moonraker den Browserzugriff ausdrücklich erlauben.</p><div class="connection"><input id="api-url" type="url" aria-label="Moonraker oder Mainsail Adresse" placeholder="http://drucker.local"><input id="api-key" type="password" aria-label="Optionaler Moonraker API-Schlüssel" placeholder="API-Schlüssel, falls erforderlich"></div><p id="connect-error"></p><button id="connect-do" class="primary">Verbinden</button> <button id="connect-close">Schließen</button></dialog>
@@ -866,6 +868,23 @@ const parserSource=$('parser-source').textContent;
 const workerURL=URL.createObjectURL(new Blob([parserSource+`\nlet source='',parsed=null;self.onmessage=e=>{try{if(e.data.type==='repair'){const parts=repairParts(source,parsed,e.data.index,e.data.options);self.postMessage({repair:new Blob(parts,{type:'text/plain'}),task:e.data.task});return;}source=e.data.text;parsed=parseGcode(source,p=>self.postMessage({progress:p,task:e.data.task}));self.postMessage({result:parsed,task:e.data.task},parsed.layers.map(l=>l.segments.buffer));}catch(err){self.postMessage({error:err.message,repairError:e.data.type==='repair',task:e.data.task});}};`],{type:'text/javascript'}));
 
 function showMessage(text,error=false){$('message').textContent=text;$('message').classList.toggle('error',error);$('message').hidden=!text;}
+function gcodeIssueText(issue){
+  // Summary findings have no offending line, even though parsing ended at one.
+  const summary=['implicit_e','no_markers','macros'].includes(issue.key);
+  return (!summary&&issue.line>0?`Zeile ${number(issue.line)}: `:'')+issue.message;
+}
+function renderFileIssues(){
+  const blocking=model.issues.filter(issue=>issue.blocksPlan);
+  $('issues').replaceChildren();
+  if(!model.issues.length){const li=document.createElement('li');li.textContent='Keine Besonderheiten bei der Geometrie erkannt.';$('issues').append(li);}
+  for(const issue of [...blocking,...model.issues.filter(issue=>!issue.blocksPlan)]){
+    const li=document.createElement('li');li.textContent=(issue.blocksPlan?'Sperre · ':'Hinweis · ')+gcodeIssueText(issue);
+    li.classList.toggle('blocking',!!issue.blocksPlan);$('issues').append(li);
+  }
+  const count=model.issues.length,blocked=blocking.length;
+  $('notes-title').textContent='Hinweise zur Datei'+(count?` (${count}${blocked?' · '+blocked+(blocked===1?' Sperre':' Sperren'):''})`:'');
+  $('file-notes').open=blocked>0;
+}
 function renderLegend(){
   const legend=$('feature-legend');legend.replaceChildren();
   FEATURE_NAMES.forEach((name,id)=>{
@@ -926,10 +945,7 @@ async function loadText(text,name,demo=false){
     if(e.data.error){showMessage(e.data.error,true);$('file-name').textContent=model?fileName:'Keine Datei';if(model)update();return;}
     model=e.data.result;fileName=name;isDemo=demo;index=demo?89:0;viewer.setModel(model);renderLegend();$('free-position').checked=false;$('material-ready').checked=false;
     $('file-stats').textContent=`${number(model.layers.length)} Schichten · ${number(model.bounds.maxZ)} mm · ${number(model.segmentCount)} Segmente`;
-    $('issues').replaceChildren();
-    if(!model.issues.length){const li=document.createElement('li');li.textContent='Keine Besonderheiten bei der Geometrie erkannt.';$('issues').append(li);}
-    for(const issue of model.issues){const li=document.createElement('li');li.textContent=issue.message;$('issues').append(li);}
-    $('notes-title').textContent=`Hinweise zur Datei${model.issues.length?' ('+model.issues.length+')':''}`;
+    renderFileIssues();
     fillTemperatures();update();
   };
   worker.onerror=()=>{loading=false;$('loading').hidden=true;showMessage('Die Vorschau konnte nicht geladen werden. Bitte die Datei erneut öffnen.',true);};
@@ -1007,7 +1023,8 @@ function checkReady(){
   if(status?.exclude_object?.excluded_objects?.length)return 'Ausgeschlossene Objekte werden in V1 noch nicht unterstützt.';
   if(isDemo)return 'Die Demo ist nur eine Vorschau. Bitte eine echte Druckdatei öffnen.';
   if(!model?.layers[index+1])return 'Keine nächste Druckschicht ausgewählt.';
-  if(model.issues.some(x=>x.blocksPlan))return 'Der G-Code enthält noch nicht unterstützte Besonderheiten.';
+  const blockingIssue=model.issues.find(issue=>issue.blocksPlan);
+  if(blockingIssue)return 'G-Code gesperrt · '+gcodeIssueText(blockingIssue)+' Alle Details unter „Hinweise zur Datei“.';
   const b=model.bounds,min=status.toolhead.axis_minimum,max=status.toolhead.axis_maximum;
   if(!min||!max||b.minX<min[0]||b.maxX>max[0]||b.minY<min[1]||b.maxY>max[1]||b.maxZ>max[2])return 'G-Code liegt außerhalb des Druckbereichs.';
   return '';

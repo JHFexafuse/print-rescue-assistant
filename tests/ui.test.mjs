@@ -126,3 +126,26 @@ test('Missing Z reference disables inspection; changed homing template prevents 
  assert.equal(a.run('profileValid'),false);assert.equal(a.elements.get('inspect').disabled,true);
  assert.equal(a.requests.filter(r=>new URL(r.url).pathname==='/printer/gcode/script').length,0);
 });
+test('G-code blockers show their cause and line; warnings alone still allow inspection',async()=>{
+ const a=await createApp();
+ a.context.fixture=fixture.replace('G1 X20 E1 F1200\n','G1 X20 E1 F1200\nSET_GCODE_OFFSET Z=0.1\nM205 X5\n');
+ await a.run("loadText(fixture,'blocked.gcode',false)");await waitUntil(()=>!a.run('loading'));
+ a.elements.get('api-url').value='http://test-printer';await a.elements.get('connect-do').emit('click');
+ a.elements.get('free-position').checked=true;await a.elements.get('free-position').emit('change');
+ assert.equal(a.elements.get('inspect').disabled,true);
+ assert.match(a.elements.get('machine-status').textContent,/Zeile 10: Befehl SET_GCODE_OFFSET/);
+ assert.equal(a.elements.get('file-notes').open,true);
+ assert.match(a.elements.get('notes-title').textContent,/2 Sperren/);
+ const issues=a.elements.get('issues').children.map(li=>li.textContent);
+ assert.match(issues[0],/^Sperre · Zeile 10: Befehl SET_GCODE_OFFSET/);
+ assert.match(issues[1],/^Sperre · Zeile 11: Befehl M205/);
+ assert.match(issues[2],/^Hinweis · Makros/);
+ await a.elements.get('inspect').emit('click');
+ assert.equal(a.requests.filter(r=>new URL(r.url).pathname==='/printer/gcode/script').length,0);
+ a.context.fixture=fixture;await a.run("loadText(fixture,'supported.gcode',false)");await waitUntil(()=>!a.run('loading'));
+ a.elements.get('free-position').checked=true;await a.elements.get('free-position').emit('change');
+ assert.equal(a.elements.get('file-notes').open,false);
+ assert.doesNotMatch(a.elements.get('notes-title').textContent,/Sperre/);
+ assert.match(a.elements.get('issues').children[0].textContent,/^Hinweis · Makros/);
+ assert.equal(a.elements.get('inspect').disabled,false);
+});

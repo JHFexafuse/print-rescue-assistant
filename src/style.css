@@ -131,6 +131,8 @@ small,.muted { color:var(--muted); }
 details:not(.preview-legend) { margin-top:16px; padding:12px 16px; border:1px solid var(--line); border-radius:4px; background:var(--panel); color:var(--muted); font-size:12px; }
 summary { cursor:pointer; }
 details ul { margin:10px 0 0; padding-left:18px; font-size:12px; line-height:1.65; }
+#issues .blocking { color:var(--text); font-weight:500; }
+#issues .blocking::marker { color:var(--error); }
 #drop-overlay { position:fixed; inset:12px; z-index:10; display:grid; place-content:center; border:2px dashed var(--accent); border-radius:4px; background:var(--panel); color:var(--text); font-size:22px; text-align:center; }
 dialog { max-width:700px; width:calc(100% - 40px); max-height:90vh; overflow:auto; padding:24px; border:1px solid var(--line); border-radius:4px; background:var(--panel); color:var(--text); box-shadow:0 12px 40px #0006; }
 dialog::backdrop { background:#0008; }

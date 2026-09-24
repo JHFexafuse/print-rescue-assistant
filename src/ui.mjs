@@ -7,6 +7,23 @@ const parserSource=$('parser-source').textContent;
 const workerURL=URL.createObjectURL(new Blob([parserSource+`\nlet source='',parsed=null;self.onmessage=e=>{try{if(e.data.type==='repair'){const parts=repairParts(source,parsed,e.data.index,e.data.options);self.postMessage({repair:new Blob(parts,{type:'text/plain'}),task:e.data.task});return;}source=e.data.text;parsed=parseGcode(source,p=>self.postMessage({progress:p,task:e.data.task}));self.postMessage({result:parsed,task:e.data.task},parsed.layers.map(l=>l.segments.buffer));}catch(err){self.postMessage({error:err.message,repairError:e.data.type==='repair',task:e.data.task});}};`],{type:'text/javascript'}));
 
 function showMessage(text,error=false){$('message').textContent=text;$('message').classList.toggle('error',error);$('message').hidden=!text;}
+function gcodeIssueText(issue){
+  // Summary findings have no offending line, even though parsing ended at one.
+  const summary=['implicit_e','no_markers','macros'].includes(issue.key);
+  return (!summary&&issue.line>0?`Zeile ${number(issue.line)}: `:'')+issue.message;
+}
+function renderFileIssues(){
+  const blocking=model.issues.filter(issue=>issue.blocksPlan);
+  $('issues').replaceChildren();
+  if(!model.issues.length){const li=document.createElement('li');li.textContent='Keine Besonderheiten bei der Geometrie erkannt.';$('issues').append(li);}
+  for(const issue of [...blocking,...model.issues.filter(issue=>!issue.blocksPlan)]){
+    const li=document.createElement('li');li.textContent=(issue.blocksPlan?'Sperre · ':'Hinweis · ')+gcodeIssueText(issue);
+    li.classList.toggle('blocking',!!issue.blocksPlan);$('issues').append(li);
+  }
+  const count=model.issues.length,blocked=blocking.length;
+  $('notes-title').textContent='Hinweise zur Datei'+(count?` (${count}${blocked?' · '+blocked+(blocked===1?' Sperre':' Sperren'):''})`:'');
+  $('file-notes').open=blocked>0;
+}
 function renderLegend(){
   const legend=$('feature-legend');legend.replaceChildren();
   FEATURE_NAMES.forEach((name,id)=>{
@@ -67,10 +84,7 @@ async function loadText(text,name,demo=false){
     if(e.data.error){showMessage(e.data.error,true);$('file-name').textContent=model?fileName:'Keine Datei';if(model)update();return;}
     model=e.data.result;fileName=name;isDemo=demo;index=demo?89:0;viewer.setModel(model);renderLegend();$('free-position').checked=false;$('material-ready').checked=false;
     $('file-stats').textContent=`${number(model.layers.length)} Schichten · ${number(model.bounds.maxZ)} mm · ${number(model.segmentCount)} Segmente`;
-    $('issues').replaceChildren();
-    if(!model.issues.length){const li=document.createElement('li');li.textContent='Keine Besonderheiten bei der Geometrie erkannt.';$('issues').append(li);}
-    for(const issue of model.issues){const li=document.createElement('li');li.textContent=issue.message;$('issues').append(li);}
-    $('notes-title').textContent=`Hinweise zur Datei${model.issues.length?' ('+model.issues.length+')':''}`;
+    renderFileIssues();
     fillTemperatures();update();
   };
   worker.onerror=()=>{loading=false;$('loading').hidden=true;showMessage('Die Vorschau konnte nicht geladen werden. Bitte die Datei erneut öffnen.',true);};

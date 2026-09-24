@@ -31,7 +31,8 @@ function checkReady(){
   if(status?.exclude_object?.excluded_objects?.length)return 'Ausgeschlossene Objekte werden in V1 noch nicht unterstützt.';
   if(isDemo)return 'Die Demo ist nur eine Vorschau. Bitte eine echte Druckdatei öffnen.';
   if(!model?.layers[index+1])return 'Keine nächste Druckschicht ausgewählt.';
-  if(model.issues.some(x=>x.blocksPlan))return 'Der G-Code enthält noch nicht unterstützte Besonderheiten.';
+  const blockingIssue=model.issues.find(issue=>issue.blocksPlan);
+  if(blockingIssue)return 'G-Code gesperrt · '+gcodeIssueText(blockingIssue)+' Alle Details unter „Hinweise zur Datei“.';
   const b=model.bounds,min=status.toolhead.axis_minimum,max=status.toolhead.axis_maximum;
   if(!min||!max||b.minX<min[0]||b.maxX>max[0]||b.minY<min[1]||b.maxY>max[1]||b.maxZ>max[2])return 'G-Code liegt außerhalb des Druckbereichs.';
   return '';

@@ -1,5 +1,11 @@
 # Änderungen
 
+## 0.1.4 – 24.09.2026 – Testversion
+
+- Bei einer G-Code-Sperre steht der konkrete Grund mit betroffener Zeile direkt über „Höhe anfahren“. Dateiweite Befunde werden ohne irreführende Zeilennummer angezeigt.
+- „Hinweise zur Datei“ öffnet sich bei Sperren automatisch, zeigt sperrende Befunde zuerst und kennzeichnet reine Hinweise getrennt.
+- Die unterstützten Befehle und die Freigabebedingungen bleiben unverändert. Ein zusätzlicher Oberflächentest prüft Sperren trotz gesetzter Bestätigung sowie die Freigabe bei reinen Hinweisen. Insgesamt 45 Softwaretests bestanden.
+
 ## 0.1.3 – 24.09.2026 – Testversion
 
 - Bedienoberfläche mit Mainsail-ähnlichen Panels, 48-px-Kopfzeilen, kompakten Schaltflächen und Eingabefeldern.
