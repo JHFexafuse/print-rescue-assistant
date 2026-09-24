@@ -6,23 +6,31 @@
 
   let panel, frame, backButton, main, page, topbar, returnFocus;
   let opened = false, previousInert = false, pendingLayout = 0;
-  let resizeObserver, mainObserver;
+  let resizeObserver, mainObserver, themeObserver, pendingTheme = 0;
   const isRescue = url => url.origin === location.origin &&
     /^\/print-rescue\/(?:index\.html)?$/.test(url.pathname);
   const style = document.createElement('style');
   style.textContent = `
     #print-rescue-panel { position:fixed; z-index:2; display:flex; flex-direction:column;
-      background:#111923; color:#e5edf5; font:14px system-ui,sans-serif; }
+      background:var(--pr-bg,#121212); color:var(--pr-text,#fff);
+      font:14px var(--pr-font,Roboto,"Segoe UI",Arial,sans-serif); }
     #print-rescue-panel[hidden] { display:none !important; }
     #print-rescue-panel .pr-embed-toolbar { display:flex; align-items:center; flex-wrap:wrap;
-      gap:12px; padding:8px 14px; border-bottom:1px solid #344353; }
-    #print-rescue-panel button { font:inherit; background:#243447; color:inherit;
-      border:1px solid #536679; border-radius:5px; padding:7px 12px; cursor:pointer; }
-    #print-rescue-panel a { color:#a9d4fc; margin-left:auto; }
+      gap:12px; min-height:48px; padding:6px 16px; background:var(--pr-toolbar,#272727);
+      border-bottom:1px solid var(--pr-line,rgba(255,255,255,.12)); }
+    #print-rescue-panel button { font:inherit; font-size:12px; font-weight:500;
+      text-transform:uppercase; letter-spacing:.75px; background:transparent; color:inherit;
+      border:1px solid var(--pr-line,rgba(255,255,255,.12)); border-radius:4px; padding:7px 12px; cursor:pointer; }
+    #print-rescue-panel button:hover { background:var(--pr-hover,rgba(255,255,255,.08)); }
+    #print-rescue-panel a { color:var(--pr-accent,#2196f3); margin-left:auto; font-size:12px; }
+    #print-rescue-panel button:focus-visible,#print-rescue-panel a:focus-visible {
+      outline:2px solid var(--pr-accent,#2196f3); outline-offset:2px; }
     #print-rescue-panel iframe { flex:1; width:100%; min-height:0; border:0; }
     body.pr-embed-open { overflow:hidden !important; }
     body.pr-embed-open #page-container { visibility:hidden !important; }
-    a.pr-embed-selected { background:rgba(100,180,240,.15) !important; }
+    a.pr-embed-selected { border-right:4px solid var(--color-primary,var(--v-primary-base,#2196f3)); }
+    body.pr-embed-open .v-navigation-drawer .active-nav-item:not(.pr-embed-selected) {
+      border-right-color:transparent; }
   `;
   document.head.append(style);
 
@@ -69,6 +77,70 @@
     if (opened && !pendingLayout) pendingLayout = requestAnimationFrame(layout);
   }
 
+  function syncTheme() {
+    pendingTheme = 0;
+    if (!panel) return;
+    const app = document.querySelector('.v-application');
+    const root = document.documentElement;
+    const light = (app || root).classList.contains('theme--light') || root.classList.contains('theme--light');
+    const css = getComputedStyle(app || root);
+    const color = (element, fallback, property='backgroundColor') => {
+      const value = element && getComputedStyle(element)[property];
+      return value && value !== 'transparent' && !/rgba\([^)]*,\s*0(?:\.0+)?\s*\)/.test(value) ? value : fallback;
+    };
+    const card = main?.querySelector('.v-card');
+    const toolbar = main?.querySelector('.panel-toolbar');
+    const values = {
+      bg:color(main, color(app, light ? '#fff' : '#121212')),
+      panel:color(card, light ? '#fff' : '#1e1e1e'),
+      toolbar:color(toolbar, light ? '#f5f5f5' : '#272727'),
+      field:light ? '#fafafa' : '#242424',
+      text:color(app, light ? 'rgba(0,0,0,.87)' : '#fff', 'color'),
+      muted:light ? 'rgba(0,0,0,.6)' : 'rgba(255,255,255,.7)',
+      line:light ? 'rgba(0,0,0,.12)' : 'rgba(255,255,255,.12)',
+      hover:light ? 'rgba(0,0,0,.06)' : 'rgba(255,255,255,.08)',
+      accent:css.getPropertyValue('--color-primary').trim() || css.getPropertyValue('--v-primary-base').trim() || '#2196f3',
+      'accent-text':css.getPropertyValue('--v-btn-text-primary').trim() || '#fff',
+      green:css.getPropertyValue('--v-success-base').trim() || '#4caf50',
+      warning:css.getPropertyValue('--color-warning').trim() || '#fb8c00',
+      error:css.getPropertyValue('--v-error-base').trim() || '#ff5252',
+      'font-family':css.fontFamily || 'Roboto,"Segoe UI",Arial,sans-serif',
+    };
+    for (const [key,value] of Object.entries(values)) panel.style.setProperty('--pr-'+(key==='font-family'?'font':key), value);
+    const doc = frame?.contentDocument;
+    if (!doc?.getElementById('scene')) return;
+    doc.documentElement.dataset.theme = light ? 'light' : 'dark';
+    for (const [key,value] of Object.entries(values)) doc.documentElement.style.setProperty('--'+key, value);
+    if (!doc.getElementById('mainsail-local-fonts')) {
+      const fonts = doc.createElement('style');
+      fonts.id = 'mainsail-local-fonts';
+      // The existing Mainsail font files, all from this same printer origin.
+      // Standalone/offline PrintRescue keeps its system-font fallback.
+      fonts.textContent = `
+        @font-face { font-family:Roboto; font-style:normal; font-weight:400; font-display:swap;
+          src:url('/fonts/roboto-regular.woff2') format('woff2'); }
+        @font-face { font-family:Roboto; font-style:normal; font-weight:500; font-display:swap;
+          src:url('/fonts/roboto-medium.woff2') format('woff2'); }
+        @font-face { font-family:'Roboto Mono'; font-style:normal; font-weight:400; font-display:swap;
+          src:url('/fonts/robotoMono-regular.woff') format('woff'); }
+      `;
+      doc.head.append(fonts);
+    }
+  }
+
+  function watchTheme() {
+    themeObserver?.disconnect();
+    themeObserver = new MutationObserver(() => {
+      if (!pendingTheme) pendingTheme = requestAnimationFrame(syncTheme);
+    });
+    const options = {attributes:true, attributeFilter:['class','style']};
+    themeObserver.observe(document.documentElement, options);
+    const app = document.querySelector('.v-application');
+    if (app) themeObserver.observe(app, options);
+    themeObserver.observe(document.head, {childList:true, subtree:true, characterData:true});
+    syncTheme();
+  }
+
   function createPanel() {
     panel = document.createElement('section');
     panel.id = 'print-rescue-panel';
@@ -89,6 +161,7 @@
     frame = document.createElement('iframe');
     frame.title = 'PrintRescue Assistant';
     frame.hidden = true;
+    frame.addEventListener('load', syncTheme);
     const loading = document.createElement('p');
     loading.style.padding = '16px';
     loading.textContent = 'PrintRescue wird geladen …';
@@ -142,6 +215,7 @@
       mainObserver.observe(main, {attributes:true, attributeFilter:['style', 'class']});
     }
     layout();
+    watchTheme();
     markLinks();
     backButton.focus();
     return true;

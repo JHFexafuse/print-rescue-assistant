@@ -7,6 +7,16 @@ const parserSource=$('parser-source').textContent;
 const workerURL=URL.createObjectURL(new Blob([parserSource+`\nlet source='',parsed=null;self.onmessage=e=>{try{if(e.data.type==='repair'){const parts=repairParts(source,parsed,e.data.index,e.data.options);self.postMessage({repair:new Blob(parts,{type:'text/plain'}),task:e.data.task});return;}source=e.data.text;parsed=parseGcode(source,p=>self.postMessage({progress:p,task:e.data.task}));self.postMessage({result:parsed,task:e.data.task},parsed.layers.map(l=>l.segments.buffer));}catch(err){self.postMessage({error:err.message,repairError:e.data.type==='repair',task:e.data.task});}};`],{type:'text/javascript'}));
 
 function showMessage(text,error=false){$('message').textContent=text;$('message').classList.toggle('error',error);$('message').hidden=!text;}
+function renderLegend(){
+  const legend=$('feature-legend');legend.replaceChildren();
+  FEATURE_NAMES.forEach((name,id)=>{
+    if(!model.featureCounts[id])return;
+    const entry=document.createElement('span'),swatch=document.createElement('i'),label=document.createElement('span');
+    swatch.style.backgroundColor=FEATURE_COLORS[id];swatch.setAttribute('aria-hidden','true');
+    label.textContent=name;entry.title=`${name} · ${number(model.featureCounts[id])} Segmente`;
+    entry.append(swatch,label);legend.append(entry);
+  });
+}
 function update(){
   if(!model)return;
   const current=model.layers[index],next=model.layers[index+1];
@@ -55,7 +65,7 @@ async function loadText(text,name,demo=false){
     if('progress'in e.data){$('progress').textContent=`Schichten analysieren · ${e.data.progress} %`;return;}
     loading=false;$('loading').hidden=true;$('slider').disabled=false;
     if(e.data.error){showMessage(e.data.error,true);$('file-name').textContent=model?fileName:'Keine Datei';if(model)update();return;}
-    model=e.data.result;fileName=name;isDemo=demo;index=demo?89:0;viewer.setModel(model);$('free-position').checked=false;$('material-ready').checked=false;
+    model=e.data.result;fileName=name;isDemo=demo;index=demo?89:0;viewer.setModel(model);renderLegend();$('free-position').checked=false;$('material-ready').checked=false;
     $('file-stats').textContent=`${number(model.layers.length)} Schichten · ${number(model.bounds.maxZ)} mm · ${number(model.segmentCount)} Segmente`;
     $('issues').replaceChildren();
     if(!model.issues.length){const li=document.createElement('li');li.textContent='Keine Besonderheiten bei der Geometrie erkannt.';$('issues').append(li);}
@@ -86,7 +96,11 @@ $('prev').addEventListener('click',()=>select(index-1));$('next').addEventListen
 $('slider').addEventListener('input',e=>select(Number(e.target.value)));
 $('ghost-count').addEventListener('change',e=>{e.target.value=Math.max(0,Math.min(100,Number(e.target.value)||0));update();});
 $('ghost-opacity').addEventListener('input',update);
-document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>viewer.view(button.dataset.view)));
+const viewButtons=document.querySelectorAll('[data-view]');
+viewButtons.forEach(button=>button.addEventListener('click',()=>{
+  viewer.view(button.dataset.view);
+  viewButtons.forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
+}));
 document.addEventListener('keydown',e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;if(e.key==='ArrowUp'||e.key==='ArrowRight'){e.preventDefault();select(index+1);}if(e.key==='ArrowDown'||e.key==='ArrowLeft'){e.preventDefault();select(index-1);}});
 document.addEventListener('dragover',e=>{e.preventDefault();$('drop-overlay').hidden=false;});
 $('drop-overlay').addEventListener('dragleave',()=>{$('drop-overlay').hidden=true;});

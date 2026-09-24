@@ -90,3 +90,17 @@ test('Selection retains original line and offset including CRLF',()=>{
  assert.equal(input.slice(m.layers[1].offset).split('\r\n')[0],'G1 X20 E4.4');
  assert.equal(input.slice(0,m.layers[1].offset).split('\n').length,m.layers[1].line);
 });
+
+test('Prusa feature distinctions affect preview metadata, never the recovery geometry',()=>{
+ const roles=['External perimeter','Perimeter','Internal infill','Solid infill','Top solid infill','Bridge infill','Support material','Support material interface'];
+ const source='M190 S77\nM104 S230\nG90\nM83\nG1 X0 Y0 Z.2 F1200\n;LAYER_CHANGE\n'+
+   roles.map((name,i)=>`;TYPE:${name}\nG1 X${i+1} E1`).join('\n')+'\n;LAYER_CHANGE\nG1 Z.4\nG1 X0 E1\nPRINT_END';
+ const plain=source.replace(/^;TYPE:.*\n/gm,'');
+ const colored=parseGcode(source), baseline=parseGcode(plain);
+ assert.deepEqual(colored.layers[0].segments.filter((_,i)=>i%7===6),new Float32Array([0,1,2,6,3,7,4,8]));
+ assert.deepEqual(colored.layers[0].segments.filter((_,i)=>i%7!==6),baseline.layers[0].segments.filter((_,i)=>i%7!==6));
+ assert.deepEqual(colored.layers[1].before,baseline.layers[1].before);
+ assert.equal(colored.featureCounts.reduce((a,b)=>a+b,0),colored.segmentCount);
+ const options={token:1,hotend:230,bed:77,fileName:'part.gcode'};
+ assert.deepEqual(repairParts(source,colored,0,options),repairParts(plain,baseline,0,options));
+});

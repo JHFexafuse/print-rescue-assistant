@@ -29,12 +29,12 @@ G1 X20 E3
 PRINT_END
 `;
 class Element{
- constructor(id){this.id=id;this.textContent='';this.value='';this.disabled=false;this.hidden=false;this.checked=false;this.listeners={};this.children=[];this.tagName='DIV';this.dataset={};this.classList={toggle(){},add(){},remove(){}};}
+ constructor(id){this.id=id;this.textContent='';this.value='';this.disabled=false;this.hidden=false;this.checked=false;this.listeners={};this.children=[];this.tagName='DIV';this.dataset={};this.style={};this.classList={toggle(){},add(){},remove(){}};}
  addEventListener(event,fn){(this.listeners[event]??=[]).push(fn);}
  async emit(event,props={}){if(this.disabled&&event==='click')return;for(const fn of this.listeners[event]||[])await fn({target:this,preventDefault(){},...props});}
  getBoundingClientRect(){return{width:950,height:570};}
  getContext(){return new Proxy({}, {get:()=>()=>{},set:()=>true});}
- setAttribute(){}setPointerCapture(){}append(el){this.children.push(el);}replaceChildren(){this.children=[];}
+ setAttribute(){}setPointerCapture(){}append(...el){this.children.push(...el);}replaceChildren(){this.children=[];}
  showModal(){this.hidden=false;}close(){this.hidden=true;}click(){return this.emit('click');}
 }
 async function waitUntil(fn){for(let i=0;i<250;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}throw new Error('UI condition timed out');}
@@ -91,6 +91,8 @@ test('Page boots, demo has 30 ghost layers, decimal comma search and stepping wo
  assert.equal(a.elements.get('active-layer').textContent,'60');
  await a.elements.get('next').emit('click');assert.equal(a.elements.get('active-layer').textContent,'61');
  assert.equal(a.elements.get('inspect').disabled,true);assert.equal(a.requests.length,0);
+ assert.equal(a.elements.get('feature-legend').children.length,2);
+ assert.equal(a.elements.get('feature-legend').children[0].children[1].textContent,'Außenkontur');
  // srcdoc has about:srcdoc as its location but inherits the Mainsail base URI.
  a.run("document.baseURI='http://printer.test/console'; location.protocol='about:'; location.origin='null';");
  await a.elements.get('connect-button').emit('click');

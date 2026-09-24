@@ -13,7 +13,8 @@ function harness({missingLayout = false, fetchFails = false} = {}) {
   class Element {
     constructor(tag) {
       this.tagName = tag.toUpperCase(); this.children = []; this.parentElement = null;
-      this.style = {}; this.attrs = new Map(); this.hidden = false; this.inert = false;
+      this.style = {setProperty(name,value){this[name]=value;}}; this.attrs = new Map(); this.hidden = false; this.inert = false;
+      this.dataset = {}; this.cssVariables = {}; this.computed = {};
       this.listeners = {}; this.target = ''; this.id = ''; this.textContent = '';
       const classes = new Set();
       this.classList = {add:name=>classes.add(name), remove:name=>classes.delete(name),
@@ -47,6 +48,11 @@ function harness({missingLayout = false, fetchFails = false} = {}) {
     addEventListener:(name, callback)=>{(events['document:'+name] ??= []).push(callback);},
   };
   document.body = new Element('body'); document.head = new Element('head');
+  document.documentElement = new Element('html'); document.documentElement.classList.add('theme--dark');
+  const application = new Element('div'); application.classList.add('v-application'); application.classList.add('theme--dark');
+  application.computed = {backgroundColor:'#121212', color:'#fff', fontFamily:'Roboto,sans-serif'};
+  application.cssVariables = {'--color-primary':'#2196f3', '--v-btn-text-primary':'#fff'};
+  document.body.append(application);
   const main = new Element('main'); main.id = 'content';
   main.padding = {paddingLeft:'220px', paddingRight:'0px', paddingTop:'64px', paddingBottom:'0px'};
   const page = new Element('div'); page.id = 'page-container'; main.append(page);
@@ -57,8 +63,8 @@ function harness({missingLayout = false, fetchFails = false} = {}) {
   const nested = new Element('span'); rescue.append(nested);
   const consoleLink = new Element('a'); consoleLink.href = location.origin+'/console';
   sidebar.append(rescue, consoleLink);
-  document.body.append(sidebar, topbar);
-  if (!missingLayout) document.body.append(main);
+  application.append(sidebar, topbar);
+  if (!missingLayout) application.append(main);
   const window = {innerWidth:1280, addEventListener:(name, callback)=>{(events['window:'+name] ??= []).push(callback);}};
   window.top = window;
   class Observer {
@@ -66,7 +72,7 @@ function harness({missingLayout = false, fetchFails = false} = {}) {
     observe() {} disconnect() {}
   }
   const context = vm.createContext({document, window, location, URL, console,
-    getComputedStyle:element=>element.padding, MutationObserver:Observer, ResizeObserver:Observer,
+    getComputedStyle:element=>({...element.computed, ...element.padding, getPropertyValue:name=>element.cssVariables[name] ?? ''}), MutationObserver:Observer, ResizeObserver:Observer,
     requestAnimationFrame:callback=>{frames.set(++nextFrame,callback); return nextFrame;},
     fetch:async(url, options)=>{
       requests.push({url, options});
@@ -82,7 +88,14 @@ function harness({missingLayout = false, fetchFails = false} = {}) {
     for (const handler of events['document:click']) handler(event);
     return event;
   }
-  return {document, window, main, page, topbar, sidebar, stop, rescue, consoleLink, requests, context,
+  return {document, window, main, page, topbar, sidebar, stop, rescue, consoleLink, requests, context, application,
+    attachFrameDocument:()=>{
+      const root = new Element('html'), head = new Element('head');
+      const doc = {documentElement:root, head, createElement:tag=>new Element(tag),
+        getElementById:id=>id==='scene' ? new Element('canvas') : head.querySelector('#'+id)};
+      document.querySelector('#print-rescue-panel').children.find(child=>child.tagName==='IFRAME').contentDocument = doc;
+      return doc;
+    },
     click, panel:()=>document.querySelector('#print-rescue-panel'),
     frame:()=>document.querySelector('#print-rescue-panel')?.children.find(child=>child.tagName==='IFRAME'),
     focus:()=>activeElement, flush:()=>{for (const [key, fn] of [...frames]) {frames.delete(key); fn();}},
@@ -173,4 +186,30 @@ test('loading the hook twice does not register a second handler or duplicate the
   const app = harness(); vm.runInContext(source, app.context); app.click();
   assert.equal(app.document.querySelectorAll('#print-rescue-panel').length, 1);
   assert.equal(app.requests.length, 1);
+});
+
+test('live Mainsail theme changes reach controls without reloading the preview or session', async () => {
+  const app = harness(); app.click();
+  await new Promise(resolve=>setImmediate(resolve));
+  const frame = app.frame(), doc = app.attachFrameDocument();
+  frame.simulatedSelection = {file:'part.gcode', layer:250, token:777};
+  const html = frame.srcdoc;
+  await frame.emit('load');
+  assert.equal(doc.documentElement.dataset.theme,'dark');
+  assert.equal(doc.documentElement.style['--accent'],'#2196f3');
+  assert.equal(doc.documentElement.style['--bg'],'#121212');
+  app.application.classList.remove('theme--dark'); app.application.classList.add('theme--light');
+  app.document.documentElement.classList.remove('theme--dark'); app.document.documentElement.classList.add('theme--light');
+  app.application.computed = {backgroundColor:'#fff', color:'#212121', fontFamily:'Roboto,sans-serif'};
+  app.application.cssVariables = {'--color-primary':'#00aa88', '--v-btn-text-primary':'#000'};
+  app.mutate(); app.flush();
+  assert.equal(doc.documentElement.dataset.theme,'light');
+  assert.equal(doc.documentElement.style['--accent'],'#00aa88');
+  assert.equal(doc.documentElement.style['--accent-text'],'#000');
+  assert.equal(doc.documentElement.style['--bg'],'#fff');
+  assert.equal(app.panel().style['--pr-accent'],'#00aa88');
+  assert.equal(doc.head.children.length,1);
+  assert.equal(frame.srcdoc,html);
+  assert.equal(frame.simulatedSelection.token,777);
+  assert.equal(app.requests.length,1);
 });

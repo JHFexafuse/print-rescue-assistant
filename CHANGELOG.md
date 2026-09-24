@@ -1,5 +1,13 @@
 # Änderungen
 
+## 0.1.3 – 24.09.2026 – Testversion
+
+- Bedienoberfläche mit Mainsail-ähnlichen Panels, 48-px-Kopfzeilen, kompakten Schaltflächen und Eingabefeldern.
+- Eingebettete Ansicht übernimmt Akzentfarbe, Hell-/Dunkelmodus, Panelhintergründe und Schrift aus Mainsail; lokale Roboto-Dateien werden auf demselben Drucker verwendet. Theme-Wechsel erhält Datei, Layerauswahl und Prüfsitzung.
+- Eigenständige 3D-Vorschau im PrusaSlicer-Stil: grauer Hintergrundverlauf, Merkmalsfarben aus PrusaSlicer 2.9.4, einklappbare Legende und dezente Pfadkonturen. Die 30 unteren Ghost-Schichten bleiben erhalten.
+- Separate Vorschaufarben unter anderem für massive Füllung, Deckfläche, Brücken, Überhänge und Stützschnittstellen. Die Farbzuordnung verändert weder Geometrie noch Wiederanlaufbefehle.
+- 44 Softwaretests bestanden. Klipper-Makros und Druckersteuerung unverändert. Visuelle Abnahme auf dem Zielsystem steht aus.
+
 ## 0.1.2 – 24.09.2026 – Testversion
 
 - Optionale Einbettung im Mainsail-Inhaltsbereich mit `--mainsail-embed`. Seitenleiste und Kopfleiste bleiben verfügbar; „Druck retten“ öffnet keinen zusätzlichen Tab.

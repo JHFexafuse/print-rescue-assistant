@@ -1,4 +1,4 @@
-# PrintRescue Assistant 0.1.2 – Printwars
+# PrintRescue Assistant 0.1.3 – Printwars
 
 Erste installierbare Testversion für die am 24.09.2026 bereitgestellte Konfiguration.
 Sie vereinfacht die Wiederaufnahme eines beschädigten Drucks bei **erhaltener Z-Referenz**.
@@ -23,6 +23,14 @@ Die Oberfläche ist unter `/print-rescue/` erreichbar. Ab Version 0.1.2 kann sie
 Seitenleiste und Kopfleiste bleiben dabei erreichbar. Beim Wechsel zu Mainsail und
 zurück bleiben geladene Datei, Layerauswahl und Prüfsitzung im Browser erhalten.
 Es werden keine Cloud-Dienste oder zusätzlichen laufenden Hintergrunddienste benötigt.
+
+### Gestaltung ab 0.1.3
+
+Die Bedienoberfläche orientiert sich an Mainsails kompakten Panels, Kopfzeilen, Schaltflächen und Eingabefeldern. Eingebettet übernimmt sie die aktuelle Akzentfarbe, Hell-/Dunkelmodus, Panelhintergründe und Schriftfamilie aus Mainsail. Die vorhandenen Roboto-Schriften werden vom selben Drucker geladen. Ein Theme-Wechsel lädt die Vorschau nicht neu; Datei, Layerauswahl und Prüfsitzung bleiben erhalten.
+
+Die **3D-Vorschau bleibt unser eigener Viewer**. Ihr Aussehen orientiert sich an PrusaSlicer 2.9.4: grauer Hintergrundverlauf, farbige Druckpfade und eine einklappbare Merkmalslegende im Vorschaufenster. Außenkontur, Kontur, Füllung, massive/obere massive Füllung, Brücken, Stützen und Stützschnittstellen werden getrennt eingefärbt. Die Legende zeigt nur Merkmale aus der geladenen Datei. Die darunterliegenden Schichten bleiben zur Orientierung grau verblasst; standardmäßig sind es weiterhin 30. Die Pfade werden als Linien dargestellt, nicht als PrusaSlicers vollständige Volumengeometrie.
+
+Farbreferenz: [PrusaSlicer-Merkmalsfarben](https://github.com/prusa3d/PrusaSlicer/blob/version_2.9.4/src/libvgcode/src/ViewerImpl.cpp) und [3D-Hintergrund](https://github.com/prusa3d/PrusaSlicer/blob/version_2.9.4/src/slic3r/GUI/GLCanvas3D.cpp). Mainsails eigener G-Code-Viewer wird nicht verwendet.
 
 ## GitHub und Updates über Mainsail
 
@@ -90,7 +98,7 @@ managed_services: klipper
 
 ### Bestehende Installation in Mainsail einbetten
 
-Den laufenden Test bzw. die Handprüfung erst abschließen, bevor die Browserseite neu geladen wird. Für dieses reine Oberflächenupdate von 0.1.1 auf 0.1.2 ist **kein Diensteneustart** nötig. Den normalen Moonraker-Update-Knopf während eines Drucks oder einer Rettung nicht verwenden: Der konfigurierte Eintrag würde Klipper neu starten.
+Den laufenden Test bzw. die Handprüfung erst abschließen, bevor die Browserseite neu geladen wird. Für die Oberflächenupdates von 0.1.1/0.1.2 auf 0.1.3 ist **kein Diensteneustart** nötig. Den normalen Moonraker-Update-Knopf während eines Drucks oder einer Rettung nicht verwenden: Der konfigurierte Eintrag würde Klipper neu starten.
 
 Auf dem Klipper-Rechner, mit den bisherigen Installationspfaden:
 
@@ -108,6 +116,8 @@ Danach Mainsail mit **Strg+F5** vollständig neu laden. „Druck retten“ öffn
 Bei HTTPS/PWA aktualisiert der Installer den HTML-Cache-Eintrag in Mainsails Workbox-Service-Worker. Gegebenenfalls nach dessen Aktualisierung nochmals neu laden. Die eingebettete Oberfläche wird als normale Datei geladen; Mainsails Routen-Cache kann sie dadurch nicht durch sein Dashboard ersetzen. Ein unbekanntes Service-Worker-Format stoppt die Installation vor Schreibzugriffen.
 
 Dies ist eine lokale Ergänzung für die Mainsail-2.x-Struktur, keine offizielle Mainsail-Plugin-Schnittstelle. Ein **Mainsail-Update kann den Loader und den Zusatzordner überschreiben**. Danach denselben `--mainsail-embed --ui-only`-Befehl wieder ausführen; dabei sind keine Klipper- oder Moonraker-Neustarts nötig. Normale PrintRescue-Updates laden die verknüpfte Oberfläche und den Loader aus dem Checkout.
+
+Ist die Einbettung aus 0.1.2 bereits eingerichtet und weiterhin vorhanden, reicht für das Designupdate auf 0.1.3 `git -C ~/print-rescue pull --ff-only` mit anschließendem vollständigem Neuladen von Mainsail. Der UI-Installer muss dann nicht erneut ausgeführt werden.
 
 ### Spätere Updates
 
@@ -239,12 +249,13 @@ V2 ist für den Wiederanlauf nach Abschaltung vorgesehen: kontrollierte manuelle
 - Installationsprüfung mit Konfigurationskopien: Probelauf, Sicherungen, wiederholte Installation, Include-Reihenfolge und unveränderte übrige Dateien.
 - Version 0.1.1: neun zusätzliche Installationstests für ZIP-zu-Git-Migration, unveränderte Mainsail-Startseite, vorhandene Menüpunkte, Dateiverknüpfungen nach einem simulierten Git-Update, Branch-Auswahl, ungültige Eingaben und Wiederherstellung nach Schreibfehler. Insgesamt 30 automatisierte Tests bestanden.
 - Version 0.1.2: sechs Tests der Einbettung mit simuliertem DOM und sechs zusätzliche Installer-Tests. Geprüft werden Navigation, Erhalt derselben eingebetteten Sitzung, Abstand zu Seitenleiste/Kopfleiste, Verbindungsverlust, Ladefehler, reine UI-Installation ohne Änderung der Druckerkonfiguration, Cache-Anpassung und Wiederherstellung nach Schreibfehler. Die Verbindungsvorbelegung innerhalb der eingebetteten Seite ist ebenfalls geprüft. Insgesamt 42 automatisierte Tests bestanden.
+- Version 0.1.3: Theme-Wechsel bei erhaltener eingebetteter Sitzung sowie getrennte Prusa-Merkmale bei unveränderter Geometrie und identischem Reparatur-G-Code geprüft. Die Legende wird im bestehenden Oberflächentest mitgeprüft. Insgesamt 44 automatisierte Tests bestanden. Ein visueller Vergleich im echten Mainsail-Browser steht weiter aus.
 
 Die Cloud-Browserumgebung hat den Zugriff auf die lokale HTML-Datei gesperrt. Deshalb wurde kein erfolgreicher visueller Browsercheck behauptet. Die DOM-Prüfungen ersetzen diesen nicht.
 
 ## Entwicklung
 
-`index.html` ist eine eigenständige Datei. Quelltexte liegen in `src/`; Klipper-Integration und Profil in `integration/`.
+`index.html` ist eine eigenständige Datei. Quelltexte und die beim Bauen eingebettete `style.css` liegen in `src/`; Klipper-Integration und Profil in `integration/`.
 Die Erstellung benötigt nur Python 3:
 
 ```bash

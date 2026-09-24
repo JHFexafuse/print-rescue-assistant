@@ -16,8 +16,8 @@ def build():
     # Function form prevents replacement content from being processed twice.
     version=(ROOT/'VERSION').read_text().strip()
     if not re.fullmatch(r'\d+\.\d+\.\d+',version):raise ValueError('Ungültige VERSION')
-    values={'__PARSER_SOURCE__':parser.replace('</script','<\\/script'),'__APP_SOURCE__':app.replace('</script','<\\/script'),'__APP_VERSION__':version}
-    html=re.sub(r'__PARSER_SOURCE__|__APP_SOURCE__|__APP_VERSION__',lambda m:values[m.group()],template)
+    values={'__PARSER_SOURCE__':parser.replace('</script','<\\/script'),'__APP_SOURCE__':app.replace('</script','<\\/script'),'__APP_VERSION__':version,'__APP_STYLE__':(ROOT/'src/style.css').read_text()}
+    html=re.sub(r'__PARSER_SOURCE__|__APP_SOURCE__|__APP_VERSION__|__APP_STYLE__',lambda m:values[m.group()],template)
     (ROOT/'index.html').write_text(html)
     print('Built',ROOT/'index.html')
 if __name__=='__main__':build()

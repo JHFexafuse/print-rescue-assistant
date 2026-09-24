@@ -1,16 +1,29 @@
 // Print Rescue: dependency-free, read-only G-code geometry parser.
 // No G-code from a file is ever executed or sent to a printer.
-export const FEATURE_NAMES = ['Außenwand', 'Innenwand', 'Füllung', 'Deckfläche', 'Stützen', 'Sonstiges'];
-export const FEATURE_COLORS = ['#ffb45b', '#ffc987', '#58cfba', '#9293ff', '#7fb7ef', '#eddfcb'];
+// Feature-type palette from PrusaSlicer 2.9.4, libvgcode/ViewerImpl.cpp.
+// The first six IDs remain compatible with the original preview data format.
+export const FEATURE_NAMES = ['Außenkontur', 'Kontur', 'Füllung', 'Obere massive Füllung', 'Stützmaterial', 'Unbekannt',
+  'Massive Füllung', 'Brückenfüllung', 'Stützmaterial-Schnittstelle', 'Überhangkontur', 'Lückenfüllung', 'Schürze / Rand', 'Bügeln', 'Reinigungsturm', 'Benutzerdefiniert'];
+export const FEATURE_COLORS = ['#ff7d38', '#ffe64d', '#b03029', '#f04040', '#00ff00', '#e6b3b3',
+  '#9654cc', '#4d80ba', '#008000', '#1f1fff', '#ffffff', '#00876e', '#ff8c69', '#b3e3ab', '#5ed194'];
 const EPS = 0.0001;
 
 export function featureId(name) {
-  const s = name.toLowerCase();
+  const s = name.toLowerCase().replace(/[_-]+/g, ' ');
+  if (/support.*(?:interface|roof|floor)/.test(s)) return 8;
+  if (/support/.test(s)) return 4;
+  if (/overhang/.test(s)) return 9;
+  if (/bridge/.test(s)) return 7;
+  if (/gap/.test(s)) return 10;
+  if (/skirt|brim/.test(s)) return 11;
+  if (/iron/.test(s)) return 12;
+  if (/wipe tower|prime tower/.test(s)) return 13;
+  if (/top/.test(s)) return 3;
+  if (/bottom|solid|skin/.test(s)) return 6;
   if (/outer|external|wall-outer/.test(s)) return 0;
   if (/inner|perimeter|wall-inner/.test(s)) return 1;
-  if (/support/.test(s)) return 4;
-  if (/top|bottom|solid|skin|bridge/.test(s)) return 3;
   if (/infill|fill/.test(s)) return 2;
+  if (/custom/.test(s)) return 14;
   return 5;
 }
 
@@ -82,6 +95,7 @@ export function parseGcode(text, progress = () => {}, maxSegments = 12000000) {
   const objectDefinitions=[];
   let active = null, lastZ = null, explicitE = false;
   const layers = [], issues = [], issueKeys = new Set(), unknown = new Map();
+  const featureCounts = new Array(FEATURE_NAMES.length).fill(0);
   const bounds = { minX: Infinity, minY: Infinity, minZ: Infinity, maxX: -Infinity, maxY: -Infinity, maxZ: -Infinity };
   function issue(key, message, blocksPlan = true) {
     if (!issueKeys.has(key)) { issues.push({ key, message, line: lineNo, blocksPlan }); issueKeys.add(key); }
@@ -95,7 +109,7 @@ export function parseGcode(text, progress = () => {}, maxSegments = 12000000) {
       layers.push(active); lastZ = b.z;
       if (layers.length > 25000) throw new Error('Mehr als 25.000 Druckebenen erkannt. Möglicherweise Spiral- oder nichtplanarer G-Code.');
     }
-    active.segments.push(a.x,a.y,a.z,b.x,b.y,b.z,feature); active.count++;
+    active.segments.push(a.x,a.y,a.z,b.x,b.y,b.z,feature); active.count++; featureCounts[feature]++;
     for (const p of [a,b]) {
       bounds.minX=Math.min(bounds.minX,p.x); bounds.maxX=Math.max(bounds.maxX,p.x);
       bounds.minY=Math.min(bounds.minY,p.y); bounds.maxY=Math.max(bounds.maxY,p.y);
@@ -193,7 +207,7 @@ export function parseGcode(text, progress = () => {}, maxSegments = 12000000) {
   if (unknown.size) issue('macros','Makros in der Datei: '+[...unknown.keys()].slice(0,10).join(', ')+'. Ihre Bewegungen sind nicht Bestandteil der Vorschau.',false);
   if(active)active.segments=new Float32Array(active.segments);
   progress(100);
-  return {layers,bounds,segmentCount,lineCount:lineNo,hasMarkers,issues,objectDefinitions};
+  return {layers,bounds,segmentCount,lineCount:lineNo,hasMarkers,issues,objectDefinitions,featureCounts};
 }
 
 export function repairParts(source,model,index,options) {

@@ -61,25 +61,34 @@ export class LayerViewer {
     // This plane marks the bottom of the displayed layer window, not the bed.
     const margin=span*.1,gminX=b.minX-margin,gmaxX=b.maxX+margin,gminY=b.minY-margin,gmaxY=b.maxY+margin;
     const step=Math.pow(10,Math.floor(Math.log10(span/8)));const grid=step*(span/step>30?5:span/step>15?2:1);
-    c.lineWidth=1;c.strokeStyle='rgba(156,177,192,.075)';c.beginPath();
+    c.beginPath();
+    const corners=[[gminX,gminY,lo],[gmaxX,gminY,lo],[gmaxX,gmaxY,lo],[gminX,gmaxY,lo]];
+    corners.forEach((p,i)=>i?c.lineTo(...project(...p)):c.moveTo(...project(...p)));
+    c.closePath();c.fillStyle='rgba(225,225,225,.22)';c.fill();
+    c.lineWidth=1;c.strokeStyle='rgba(40,40,40,.17)';c.beginPath();
     for(let x=Math.ceil(gminX/grid)*grid;x<=gmaxX;x+=grid)line([x,gminY,lo],[x,gmaxY,lo]);
     for(let y=Math.ceil(gminY/grid)*grid;y<=gmaxY;y+=grid)line([gminX,y,lo],[gmaxX,y,lo]);c.stroke();
     let ghostSegments=0;for(let i=first;i<this.index;i++)ghostSegments+=layers[i].count;
     const stride=Math.max(1,Math.ceil(ghostSegments/220000));
     for(let i=first;i<this.index;i++){
       const a=layers[i].segments;
-      c.strokeStyle=`rgba(123,165,181,${this.opacity*(.55+.45*(i-first+1)/Math.max(1,this.index-first))})`;
+      c.strokeStyle=`rgba(60,60,60,${this.opacity*(.55+.45*(i-first+1)/Math.max(1,this.index-first))})`;
       c.lineWidth=.8;c.beginPath();
       for(let j=0;j<a.length;j+=7*stride)line([a[j],a[j+1],a[j+2]],[a[j+3],a[j+4],a[j+5]]);c.stroke();
     }
     const a=last.segments;
-    for(let kind=0;kind<6;kind++){
-      c.strokeStyle=FEATURE_COLORS[kind];c.lineWidth=1.65;c.lineCap='round';c.beginPath();
-      for(let j=0;j<a.length;j+=7)if(a[j+6]===kind)line([a[j],a[j+1],a[j+2]],[a[j+3],a[j+4],a[j+5]]);c.stroke();
+    for(let kind=0;kind<FEATURE_COLORS.length;kind++){
+      c.lineCap='round';c.lineJoin='round';c.beginPath();
+      for(let j=0;j<a.length;j+=7)if(a[j+6]===kind)line([a[j],a[j+1],a[j+2]],[a[j+3],a[j+4],a[j+5]]);
+      // A narrow dark edge keeps light Prusa roles (yellow, white) legible on
+      // the grey viewport without changing their actual feature colors.
+      const width=Math.max(1.65,Math.min(3,1.65*Math.sqrt(this.zoom)));
+      c.strokeStyle='rgba(30,30,30,.45)';c.lineWidth=width+.65;c.stroke();
+      c.strokeStyle=FEATURE_COLORS[kind];c.lineWidth=width;c.stroke();
     }
     // Axis orientation independent of the object scale.
-    const axisOrigin=[48,h-55],axisLength=26;
-    const vectors=[['X','#ec8c8c',cos,sin*sp],['Y','#72d1ac',-sin,cos*sp],['Z','#91bafa',0,-cp]];
+    const axisOrigin=[w-60,110],axisLength=25;
+    const vectors=[['X','#d72b2b',cos,sin*sp],['Y','#008d34',-sin,cos*sp],['Z','#254de0',0,-cp]];
     c.font='11px ui-monospace,monospace';c.lineWidth=1.8;
     for(const[label,color,x,y]of vectors){c.strokeStyle=color;c.fillStyle=color;c.beginPath();c.moveTo(...axisOrigin);c.lineTo(axisOrigin[0]+x*axisLength,axisOrigin[1]+y*axisLength);c.stroke();c.fillText(label,axisOrigin[0]+x*(axisLength+12)-3,axisOrigin[1]+y*(axisLength+12)+4);}
   }
